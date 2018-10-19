@@ -136,7 +136,7 @@ def call(Map params = [:])
 
 						stage("deploy (${platform})")
 						{
-							if (env.TAG_NAME != null)
+							if (platform != 'ios-armv7' && platform != 'ios-aarch64' && env.TAG_NAME != null)
 							{
 								echo "Deploying: ${addon} ${env.TAG_NAME}"
 								versionFolder = VERSIONS_VALID[version]
