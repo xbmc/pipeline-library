@@ -24,12 +24,20 @@ def call(Map addonParams = [:])
 		'windows-i686': 'windows/win32',
 		'windows-x86_64': 'windows/x64'
 	]
+	def PLATFORMS_DEPLOY = [
+		'android-armv7',
+		'android-aarch64',
+		'osx-x86_64',
+		'windows-i686',
+		'windows-x86_64'
+	]
 	def VERSIONS_VALID = [
 		'master': 'leia',
 		'Leia': 'leia'
 	]
 
 	def platforms = addonParams.containsKey('platforms') && addonParams.platforms.metaClass.respondsTo('each') && addonParams.platforms.every{ p -> p in PLATFORMS_VALID } ? addonParams.platforms : PLATFORMS_VALID.keySet()
+	def deploy = addonParams.containsKey('deploy') && addonParams.deploy.metaClass.respondsTo('each') ? addonParams.deploy.findAll{ d -> d in platforms && d in PLATFORMS_DEPLOY } : PLATFORMS_DEPLOY
 	def version = addonParams.containsKey('version') && addonParams.version in VERSIONS_VALID ? addonParams.version : VERSIONS_VALID.keySet()[0]
 	def addon = env.JOB_NAME.tokenize('/')[1]
 	Map tasks = [failFast: false]
@@ -136,7 +144,7 @@ def call(Map addonParams = [:])
 
 						stage("deploy (${platform})")
 						{
-							if (platform != 'ios-armv7' && platform != 'ios-aarch64' && env.TAG_NAME != null)
+							if (platform in deploy && env.TAG_NAME != null)
 							{
 								echo "Deploying: ${addon} ${env.TAG_NAME}"
 								versionFolder = VERSIONS_VALID[version]
