@@ -3,7 +3,7 @@ import hudson.plugins.throttleconcurrents.ThrottleJobProperty;
 /**
  * Simple wrapper step for building a plugin
  */
-def call(Map params = [:])
+def call(Map addonParams = [:])
 {
 	properties([
 		buildDiscarder(logRotator(artifactDaysToKeepStr: '', artifactNumToKeepStr: '', daysToKeepStr: '', numToKeepStr: '5')),
@@ -29,8 +29,8 @@ def call(Map params = [:])
 		'Leia': 'leia'
 	]
 
-	def platforms = params.containsKey('platforms') && params.platforms.metaClass.respondsTo('each') && params.platforms.every{ p -> p in PLATFORMS_VALID } ? params.platforms : PLATFORMS_VALID.keySet()
-	def version = params.containsKey('version') && params.version in VERSIONS_VALID ? params.version : VERSIONS_VALID.keySet()[0]
+	def platforms = addonParams.containsKey('platforms') && addonParams.platforms.metaClass.respondsTo('each') && addonParams.platforms.every{ p -> p in PLATFORMS_VALID } ? addonParams.platforms : PLATFORMS_VALID.keySet()
+	def version = addonParams.containsKey('version') && addonParams.version in VERSIONS_VALID ? addonParams.version : VERSIONS_VALID.keySet()[0]
 	def addon = env.JOB_NAME.tokenize('/')[1]
 	Map tasks = [failFast: false]
 
