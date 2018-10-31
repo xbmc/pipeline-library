@@ -67,11 +67,13 @@ def call(Map addonParams = [:])
 							pwd = pwd()
 							checkout([
 								changelog: false,
-								$class: 'GitSCM',
-								branches: [[name: "*/${version}"]],
-								doGenerateSubmoduleConfigurations: false,
-								extensions: [[$class: 'CloneOption', 'honorRefspec': true, 'noTags': true, 'reference': "${pwd}/../../kodi"]],
-								userRemoteConfigs: [[refspec: "+refs/heads/${version}:refs/remotes/origin/${version}", url: 'https://github.com/xbmc/xbmc.git']]
+								scm: [
+									$class: 'GitSCM',
+									branches: [[name: "*/${version}"]],
+									doGenerateSubmoduleConfigurations: false,
+									extensions: [[$class: 'CloneOption', honorRefspec: true, noTags: true, reference: "${pwd}/../../kodi"]],
+									userRemoteConfigs: [[refspec: "+refs/heads/${version}:refs/remotes/origin/${version}", url: 'https://github.com/xbmc/xbmc.git']]
+								]
 							])
 
 							if (isUnix())
