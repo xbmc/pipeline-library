@@ -1,19 +1,11 @@
 import hudson.plugins.throttleconcurrents.ThrottleJobProperty;
+import com.cwctravel.hudson.plugins.extended_choice_parameter.ExtendedChoiceParameterDefinition;
 
 /**
  * Simple wrapper step for building a plugin
  */
 def call(Map addonParams = [:])
 {
-	properties([
-		buildDiscarder(logRotator(artifactDaysToKeepStr: '', artifactNumToKeepStr: '', daysToKeepStr: '', numToKeepStr: '5')),
-		disableConcurrentBuilds(),
-		disableResume(),
-		durabilityHint('PERFORMANCE_OPTIMIZED'),
-		pipelineTriggers(env.BRANCH_NAME == 'master' ? [cron('@weekly')] : []),
-		[$class: 'RebuildSettings', autoRebuild: false, rebuildDisabled: true],
-		[$class: 'ThrottleJobProperty', categories: [], limitOneJobWithMatchingParams: false, maxConcurrentPerNode: 0, maxConcurrentTotal: 1, paramsToUseForLimit: '', throttleEnabled: true, throttleOption: 'category']
-	])
 
 	def PLATFORMS_VALID = [
 		'android-armv7': 'android',
@@ -21,6 +13,7 @@ def call(Map addonParams = [:])
 		'ios-armv7': 'ios',
 		'ios-aarch64': 'ios',
 		'osx-x86_64': 'osx64',
+		'ubuntu-ppa': 'linux',
 		'windows-i686': 'windows/win32',
 		'windows-x86_64': 'windows/x64'
 	]
@@ -28,16 +21,50 @@ def call(Map addonParams = [:])
 		'android-armv7',
 		'android-aarch64',
 		'osx-x86_64',
+		'ubuntu-ppa',
 		'windows-i686',
 		'windows-x86_64'
+	]
+	def UBUNTU_DISTS = [
+		'cosmic',
+		'bionic',
+		'xenial'
 	]
 	def VERSIONS_VALID = [
 		'master': 'leia',
 		'Leia': 'leia'
 	]
+	def PPAS_VALID = [
+		'nightly': 'ppa:team-xbmc/xbmc-nightly',
+		'unstable': 'ppa:team-xbmc/unstable',
+		'stable': 'ppa:team-xbmc/ppa',
+		'wsnipex-test': 'ppa:wsnipex/xbmc-addons-test'
+	]
+	def PPA_VERSION_MAP = [
+		'master': 'nightly',
+		'Leia': 'unstable'
+	]
 
+	properties([
+		buildDiscarder(logRotator(artifactDaysToKeepStr: '', artifactNumToKeepStr: '', daysToKeepStr: '', numToKeepStr: '5')),
+		disableConcurrentBuilds(),
+		disableResume(),
+		durabilityHint('PERFORMANCE_OPTIMIZED'),
+		pipelineTriggers(env.BRANCH_NAME == 'master' ? [cron('@weekly')] : []),
+		[$class: 'RebuildSettings', autoRebuild: false, rebuildDisabled: true],
+		[$class: 'ThrottleJobProperty', categories: [], limitOneJobWithMatchingParams: false, maxConcurrentPerNode: 0, maxConcurrentTotal: 1, paramsToUseForLimit: '', throttleEnabled: true, throttleOption: 'category'],
+		parameters([
+			extendedChoice('deployPlatforms', PLATFORMS_DEPLOY.join(','), PLATFORMS_DEPLOY.join(','), 'Platforms to deploy, deploy param from Jenkinsfile is always respected'),
+			extendedChoice('PPA', PPAS_VALID.keySet().join(',')+',auto', 'auto', 'PPA to use'),
+			extendedChoice('dists', UBUNTU_DISTS.join(','), UBUNTU_DISTS.join(','), 'Ubuntu version to build for'),
+			string(defaultValue: '1', description: 'debian package revision tag', name: 'TAGREV', trim: true),
+			booleanParam(defaultValue: false, description: 'Force upload to PPA', name: 'force_ppa_upload')
+		])
+	])
+
+	def deployPlatforms = params.deployPlatforms.tokenize(',')
 	def platforms = addonParams.containsKey('platforms') && addonParams.platforms.metaClass.respondsTo('each') && addonParams.platforms.every{ p -> p in PLATFORMS_VALID } ? addonParams.platforms : PLATFORMS_VALID.keySet()
-	def deploy = addonParams.containsKey('deploy') && addonParams.deploy.metaClass.respondsTo('each') ? addonParams.deploy.findAll{ d -> d in platforms && d in PLATFORMS_DEPLOY } : PLATFORMS_DEPLOY
+	def deploy = addonParams.containsKey('deploy') && addonParams.deploy.metaClass.respondsTo('each') ? addonParams.deploy.findAll{ d -> d in platforms && d in PLATFORMS_DEPLOY && d in deployPlatforms } : PLATFORMS_DEPLOY
 	def version = addonParams.containsKey('version') && addonParams.version in VERSIONS_VALID ? addonParams.version : VERSIONS_VALID.keySet()[0]
 	def addon = env.JOB_NAME.tokenize('/')[1]
 	Map tasks = [failFast: false]
@@ -54,6 +81,8 @@ def call(Map addonParams = [:])
 			ThrottleJobProperty.fetchDescriptor().getCategories().add(new ThrottleJobProperty.ThrottleCategory(category, 1, 0, null));
 			ThrottleJobProperty.fetchDescriptor().save()
 		}
+
+		if (platform == 'ubuntu-ppa') continue
 
 		tasks[platform] = {
 			throttle(["binary-addons/${platform}-${version}"])
@@ -183,5 +212,132 @@ exit \$PUBLISHED
 		}
 	}
 
+	if ("ubuntu-ppa" in deploy)
+	{
+		platform = "ubuntu-ppa"
+		tasks[platform] = {
+			throttle(["binary-addons/${platform}-${version}"])
+			{
+				node(PLATFORMS_VALID[platform])
+				{
+					ws("workspace/binary-addons/kodi-${platform}-${version}")
+					{
+						def packageversion
+						def dists = params.dists.tokenize(',')
+						def ppas = params.PPA == "auto" ? [PPAS_VALID[PPA_VERSION_MAP[version]]] : []
+						if (ppas.size() == 0)
+						{
+							params.PPA.tokenize(',').each{p -> ppas.add(PPAS_VALID[p])}
+						}
+
+						stage("clone ${platform}")
+						{
+							dir("${addon}")
+							{
+								if (env.BRANCH_NAME)
+								{
+									def scmVars = checkout(scm)
+									currentBuild.displayName = scmVars.GIT_BRANCH + '-' + scmVars.GIT_COMMIT.substring(0, 7)
+								}
+								else if ((env.BRANCH_NAME == null) && (repo))
+								{
+									git repo
+								}
+								else
+								{
+									error 'buildPlugin must be used as part of a Multibranch Pipeline *or* a `repo` argument must be provided'
+								}
+							}
+						}
+
+						stage("build ${platform}")
+						{
+							if (params.force_ppa_upload)
+							{
+								sh "rm -f kodi-*.changes kodi-*.build kodi-*.upload"
+							}
+
+							dir("${addon}")
+							{
+								echo "Ubuntu dists enabled: ${dists} - TAGREV: ${params.TAGREV} - PPA: ${params.PPA}"
+								def addonsxml = readFile "${addon}/addon.xml.in"
+								packageversion = getVersion(addonsxml)
+								echo "Detected PackageVersion: ${packageversion}"
+								def changelogin = readFile 'debian/changelog.in'
+								def origtarball = 'kodi-' + addon.replace('.', '-') + "_${packageversion}.orig.tar.gz"
+
+								sh "git archive --format=tar.gz -o ../${origtarball} HEAD"
+
+								for (dist in dists)
+								{
+									echo "Building debian-source package for ${dist}"
+									def changelog = changelogin.replace('#PACKAGEVERSION#', packageversion).replace('#TAGREV#', params.TAGREV).replace('#DIST#', dist)
+									writeFile file: "debian/changelog", text: "${changelog}"
+									sh "debuild -S -k'jenkins (jenkins build bot) <jenkins@kodi.tv>'"
+								}
+							}
+						}
+
+						stage("deploy ${platform}")
+						{
+							if (env.TAG_NAME != null || params.force_ppa_upload)
+							{
+								def force = params.force_ppa_upload ? '-f' : ''
+								def changespattern = 'kodi-' + addon.replace('.', '-') + "_${packageversion}-${params.TAGREV}*_source.changes"
+								for (ppa in ppas)
+								{
+									echo "Uploading ${changespattern} to ${ppa}"
+									sh "dput ${force} ${ppa} ${changespattern}"
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
 	parallel(tasks)
+}
+
+def extendedChoice(name, choices, defaultchoice, desc)
+{
+	return new ExtendedChoiceParameterDefinition(
+	        name /* String name */,
+	        ExtendedChoiceParameterDefinition.PARAMETER_TYPE_MULTI_SELECT /* String type */,
+	        choices /* String value */,
+	        null /* String projectName */,
+	        null /* String propertyFile */,
+	        null /* String groovyScript */,
+	        null /* String groovyScriptFile */,
+	        null /* String bindings */,
+	        null /* String groovyClasspath */,
+	        null /* String propertyKey */,
+	        defaultchoice /* String defaultValue */,
+	        null /* String defaultPropertyFile */,
+	        null /* String defaultGroovyScript */,
+	        null /* String defaultGroovyScriptFile */,
+	        null /* String defaultBindings */,
+	        null /* String defaultGroovyClasspath */,
+	        null /* String defaultPropertyKey */,
+	        null /* String descriptionPropertyValue */,
+	        null /* String descriptionPropertyFile */,
+	        null /* String descriptionGroovyScript */,
+	        null /* String descriptionGroovyScriptFile */,
+	        null /* String descriptionBindings */,
+	        null /* String descriptionGroovyClasspath */,
+	        null /* String descriptionPropertyKey */,
+	        null /* String javascriptFile */,
+	        null /* String javascript */,
+	        false /* boolean saveJSONParameterToFile*/,
+	        false /* boolean quoteValue */,
+	        choices.tokenize(',').size(), /* int visibleItemCount */,
+	        desc /* String description */,
+	        null /* String multiSelectDelimiter */
+	)
+}
+
+@NonCPS
+def getVersion(text) {
+	def matcher = text =~ /version=\"([\d.]+)\"/
+        matcher ? matcher.getAt(1)[1] : null
 }
