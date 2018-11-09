@@ -212,7 +212,7 @@ exit \$PUBLISHED
 		}
 	}
 
-	if ("ubuntu-ppa" in deploy)
+	if ("ubuntu-ppa" in platforms && "ubuntu-ppa" in deploy)
 	{
 		platform = "ubuntu-ppa"
 		tasks[platform] = {
