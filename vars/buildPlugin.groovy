@@ -32,7 +32,6 @@ def call(Map addonParams = [:])
 		'xenial'
 	]
 	def VERSIONS_VALID = [
-		'master': 'leia',
 		'Leia': 'leia'
 	]
 	def PPAS_VALID = [
