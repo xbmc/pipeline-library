@@ -42,7 +42,7 @@ def call(Map addonParams = [:])
 	]
 	def PPA_VERSION_MAP = [
 		'master': 'nightly',
-		'Leia': 'unstable'
+		'Leia': 'stable',
 	]
 
 	properties([
