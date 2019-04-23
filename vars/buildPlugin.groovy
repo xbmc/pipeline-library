@@ -32,7 +32,8 @@ def call(Map addonParams = [:])
 		'xenial'
 	]
 	def VERSIONS_VALID = [
-		'Leia': 'leia'
+		'Leia': 'leia',
+		'Matrix': 'matrix',
 	]
 	def PPAS_VALID = [
 		'nightly': 'ppa:team-xbmc/xbmc-nightly',
@@ -41,8 +42,8 @@ def call(Map addonParams = [:])
 		'wsnipex-test': 'ppa:wsnipex/xbmc-addons-test'
 	]
 	def PPA_VERSION_MAP = [
-		'master': 'nightly',
 		'Leia': 'stable',
+		'Matrix': 'nightly',
 	]
 
 	properties([
@@ -94,14 +95,15 @@ def call(Map addonParams = [:])
 						stage("prepare (${platform})")
 						{
 							pwd = pwd()
+							kodiBranch = version == "Matrix" ? "master" : version
 							checkout([
 								changelog: false,
 								scm: [
 									$class: 'GitSCM',
-									branches: [[name: "*/${version}"]],
+									branches: [[name: "*/${kodiBranch}"]],
 									doGenerateSubmoduleConfigurations: false,
 									extensions: [[$class: 'CloneOption', honorRefspec: true, noTags: true, reference: "${pwd}/../../kodi"]],
-									userRemoteConfigs: [[refspec: "+refs/heads/${version}:refs/remotes/origin/${version}", url: 'https://github.com/xbmc/xbmc.git']]
+									userRemoteConfigs: [[refspec: "+refs/heads/${kodiBranch}:refs/remotes/origin/${kodiBranch}", url: 'https://github.com/xbmc/xbmc.git']]
 								]
 							])
 
