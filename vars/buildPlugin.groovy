@@ -51,7 +51,7 @@ def call(Map addonParams = [:])
 		disableConcurrentBuilds(),
 		disableResume(),
 		durabilityHint('PERFORMANCE_OPTIMIZED'),
-		pipelineTriggers(env.BRANCH_NAME == 'master' ? [cron('@weekly')] : []),
+		pipelineTriggers(env.BRANCH_NAME == 'Matrix' ? [cron('@weekly')] : []),
 		[$class: 'RebuildSettings', autoRebuild: false, rebuildDisabled: true],
 		[$class: 'ThrottleJobProperty', categories: [], limitOneJobWithMatchingParams: false, maxConcurrentPerNode: 0, maxConcurrentTotal: 1, paramsToUseForLimit: '', throttleEnabled: true, throttleOption: 'category'],
 		parameters([
