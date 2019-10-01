@@ -102,7 +102,7 @@ def call(Map addonParams = [:])
 									$class: 'GitSCM',
 									branches: [[name: "*/${kodiBranch}"]],
 									doGenerateSubmoduleConfigurations: false,
-									extensions: [[$class: 'CloneOption', honorRefspec: true, noTags: true, reference: "${pwd}/../../kodi"]],
+									extensions: [[$class: 'CloneOption', timeout: 20, honorRefspec: true, noTags: true, reference: "${pwd}/../../kodi"]],
 									userRemoteConfigs: [[refspec: "+refs/heads/${kodiBranch}:refs/remotes/origin/${kodiBranch}", url: 'https://github.com/xbmc/xbmc.git']]
 								]
 							])
