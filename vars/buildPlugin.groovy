@@ -26,8 +26,8 @@ def call(Map addonParams = [:])
 		'windows-x86_64'
 	]
 	def UBUNTU_DISTS = [
+		'eoan',
 		'disco',
-		'cosmic',
 		'bionic',
 		'xenial'
 	]
