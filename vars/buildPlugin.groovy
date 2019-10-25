@@ -68,6 +68,12 @@ def call(Map addonParams = [:])
 	def deploy = addonParams.containsKey('deploy') && addonParams.deploy.metaClass.respondsTo('each') ? addonParams.deploy.findAll{ d -> d in platforms && d in PLATFORMS_DEPLOY && d in deployPlatforms } : PLATFORMS_DEPLOY
 	def version = addonParams.containsKey('version') && addonParams.version in VERSIONS_VALID ? addonParams.version : VERSIONS_VALID.keySet()[0]
 	def addon = env.JOB_NAME.tokenize('/')[1]
+	/**
+	 * Definition in case if an addon source code contains several addons,
+	 * then the start name of the various addons with Asterix is given with e.g.
+	 * `buildPlugin(archive: 'USED_PREFIX.*', ...)`.
+	 */
+	def archiveName = addonParams.containsKey('archive') && addonParams.containsKey('archive') != null ? addonParams.archive : addon
 	Map tasks = [failFast: false]
 
 	env.Configuration = 'Release'
@@ -172,7 +178,7 @@ def call(Map addonParams = [:])
 
 						stage("archive (${platform})")
 						{
-							archiveArtifacts artifacts: "cmake/addons/build/zips/${addon}+${platform}/${addon}-*.zip"
+							archiveArtifacts artifacts: "cmake/addons/build/zips/${archiveName}+${platform}/${archiveName}-*.zip"
 						}
 
 						stage("deploy (${platform})")
@@ -188,19 +194,26 @@ def call(Map addonParams = [:])
 											transfers: [
 												sshTransfer(
 													execCommand: """\
+RET_VALUE=0
 mkdir -p /home/git/addons-binary/${versionFolder}
-chmod 444 upload/${addon}+${platform}/${addon}-*.zip
-(mv upload/${addon}+${platform}/ /home/git/addons-binary/${versionFolder}/ || cp upload/${addon}+${platform}/${addon}-*.zip /home/git/addons-binary/${versionFolder}/${addon}+${platform}/) 2> /dev/null
-PUBLISHED=\$?
-if [ \$PUBLISHED -ne 0 ]; then
-	echo `ls upload/${addon}+${platform}/${addon}-*.zip | cut -d / -f 2-` was already published >&2
-fi
-rm -fr upload/${addon}+${platform}/ 2> /dev/null
-exit \$PUBLISHED
+for addonDir in \$(ls -d upload/${archiveName}+${platform})
+do
+	addonFolder=\$(echo \${addonDir} | awk '{split($0,a,"/"); print a[2]}')
+	chmod 444 \${addonDir}/${archiveName}.zip
+	(mv \${addonDir}/ /home/git/addons-binary/${versionFolder}/ || \
+	 cp \${addonDir}/${archiveName}-*.zip /home/git/addons-binary/${versionFolder}/\${addonFolder}/) 2> /dev/null
+	PUBLISHED=\$?
+	if [ \$PUBLISHED -ne 0 ]; then
+		echo `ls upload/\${addonFolder}/${archiveName}-*.zip | cut -d / -f 2-` was already published >&2
+		RET_VALUE=\$PUBLISHED
+	fi
+	rm -fr \${addonDir}/ 2> /dev/null
+done
+exit \$
 """,
 													remoteDirectory: 'upload',
 													removePrefix: 'cmake/addons/build/zips/',
-													sourceFiles: "cmake/addons/build/zips/${addon}+${platform}/${addon}-*.zip"
+													sourceFiles: "cmake/addons/build/zips/${archiveName}+${platform}/${archiveName}-*.zip"
 												)
 											]
 										)
