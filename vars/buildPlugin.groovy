@@ -198,7 +198,7 @@ RET_VALUE=0
 mkdir -p /home/git/addons-binary/${versionFolder}
 for addonDir in \$(ls -d upload/${archiveName}+${platform})
 do
-	addonFolder=\$(echo \${addonDir} | awk '{split($0,a,"/"); print a[2]}')
+	addonFolder=\$(echo \${addonDir} | awk '{split(\$0,a,"/"); print a[2]}')
 	chmod 444 \${addonDir}/${archiveName}.zip
 	(mv \${addonDir}/ /home/git/addons-binary/${versionFolder}/ || \
 	 cp \${addonDir}/${archiveName}-*.zip /home/git/addons-binary/${versionFolder}/\${addonFolder}/) 2> /dev/null
