@@ -209,7 +209,7 @@ do
 	fi
 	rm -fr \${addonDir}/ 2> /dev/null
 done
-exit \$
+exit \$RET_VALUE
 """,
 													remoteDirectory: 'upload',
 													removePrefix: 'cmake/addons/build/zips/',
