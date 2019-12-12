@@ -15,7 +15,9 @@ def call(Map addonParams = [:])
 		'osx-x86_64': 'osx64',
 		'ubuntu-ppa': 'linux',
 		'windows-i686': 'windows/win32',
-		'windows-x86_64': 'windows/x64'
+		'windows-x86_64': 'windows/x64',
+		'windows-i686-uwp': 'windows/win32-uwp',
+		'windows-x86_64-uwp': 'windows/x64-uwp'
 	]
 	def PLATFORMS_DEPLOY = [
 		'android-armv7',
