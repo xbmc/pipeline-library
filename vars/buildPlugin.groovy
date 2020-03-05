@@ -81,6 +81,8 @@ def call(Map addonParams = [:])
 	for (int i = 0; i < platforms.size(); ++i)
 	{
 		String platform = platforms[i]
+		if (platform == 'ios-armv7' && version != 'Leia')
+			continue;
 
 		def category = "binary-addons/${platform}-${version}"
 		if (ThrottleJobProperty.fetchDescriptor().getCategories().every{ c -> c.getCategoryName() !=  category})
