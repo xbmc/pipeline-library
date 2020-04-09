@@ -288,7 +288,7 @@ exit \$RET_VALUE
 									echo "Building debian-source package for ${dist}"
 									def changelog = changelogin.replace('#PACKAGEVERSION#', packageversion).replace('#TAGREV#', params.TAGREV).replace('#DIST#', dist)
 									writeFile file: "debian/changelog", text: "${changelog}"
-									sh "debuild -S -k'jenkins (jenkins build bot) <jenkins@kodi.tv>'"
+									sh "debuild -d -S -k'jenkins (jenkins build bot) <jenkins@kodi.tv>'"
 								}
 							}
 						}
