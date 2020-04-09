@@ -74,7 +74,13 @@ def call(Map addonParams = [:])
 		])
 	])
 
-	def version = addonParams.containsKey('version') && addonParams.version in VERSIONS_VALID ? addonParams.version : VERSIONS_VALID.keySet()[0]
+	if (!addonParams.containsKey('version') || !(addonParams.version in VERSIONS_VALID))
+	{
+		error 'No valid Kodi version given by addon'
+		return
+	}
+
+	def version = addonParams.version
 	if (version == "Leia")
 	{
 		PLATFORMS_VALID = PLATFORMS_VALID_LEIA
