@@ -6,6 +6,12 @@ import com.cwctravel.hudson.plugins.extended_choice_parameter.ExtendedChoicePara
  */
 def call(Map addonParams = [:])
 {
+	def VERSIONS_VALID = [
+		'Leia': 'leia',
+		'Matrix': 'matrix',
+	]
+
+	def version = addonParams.containsKey('version') && addonParams.version in VERSIONS_VALID ? addonParams.version : VERSIONS_VALID.keySet()[0]
 
 	def PLATFORMS_VALID = [
 		'android-armv7': 'android',
@@ -17,6 +23,13 @@ def call(Map addonParams = [:])
 		'windows-i686': 'windows/win32',
 		'windows-x86_64': 'windows/x64'
 	]
+
+	List<String> versionsKeys = new ArrayList<String>(VERSIONS_VALID.keySet());
+	if (versionsKeys.indexOf(version) >= versionsKeys.indexOf('Matrix'))
+	{
+		PLATFORMS_VALID.remove('ios-armv7')
+	}
+
 	def PLATFORMS_DEPLOY = [
 		'android-armv7',
 		'android-aarch64',
@@ -30,10 +43,6 @@ def call(Map addonParams = [:])
 		'eoan',
 		'bionic',
 		'xenial'
-	]
-	def VERSIONS_VALID = [
-		'Leia': 'leia',
-		'Matrix': 'matrix',
 	]
 	def PPAS_VALID = [
 		'nightly': 'ppa:team-xbmc/xbmc-nightly',
@@ -66,7 +75,6 @@ def call(Map addonParams = [:])
 	def deployPlatforms = params.deployPlatforms.tokenize(',')
 	def platforms = addonParams.containsKey('platforms') && addonParams.platforms.metaClass.respondsTo('each') && addonParams.platforms.every{ p -> p in PLATFORMS_VALID } ? addonParams.platforms : PLATFORMS_VALID.keySet()
 	def deploy = addonParams.containsKey('deploy') && addonParams.deploy.metaClass.respondsTo('each') ? addonParams.deploy.findAll{ d -> d in platforms && d in PLATFORMS_DEPLOY && d in deployPlatforms } : PLATFORMS_DEPLOY
-	def version = addonParams.containsKey('version') && addonParams.version in VERSIONS_VALID ? addonParams.version : VERSIONS_VALID.keySet()[0]
 	def addon = env.JOB_NAME.tokenize('/')[1]
 	/**
 	 * Definition in case if an addon source code contains several addons,
