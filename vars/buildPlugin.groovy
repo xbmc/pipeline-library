@@ -352,7 +352,8 @@ def extendedChoice(name, choices, defaultchoice, desc)
 }
 
 @NonCPS
-def getVersion(text) {
+def getVersion(text)
+{
 	def matcher = text =~ /version=\"([\d.]+)\"/
-        matcher ? matcher.getAt(1)[1] : null
+	matcher ? matcher.getAt(1)[1] : null
 }
