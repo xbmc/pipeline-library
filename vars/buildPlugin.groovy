@@ -19,6 +19,7 @@ def call(Map addonParams = [:])
 		'ios-armv7': 'ios',
 		'ios-aarch64': 'ios',
 		'osx-x86_64': 'osx64',
+		'tvos-aarch64': 'tvos',
 		'ubuntu-ppa': 'linux',
 		'windows-i686': 'windows/win32',
 		'windows-x86_64': 'windows/x64'
@@ -28,6 +29,10 @@ def call(Map addonParams = [:])
 	if (versionsKeys.indexOf(version) >= versionsKeys.indexOf('Matrix'))
 	{
 		PLATFORMS_VALID.remove('ios-armv7')
+	}
+	if (versionsKeys.indexOf(version) < versionsKeys.indexOf('Matrix'))
+	{
+		PLATFORMS_VALID.remove('tvos-aarch64')
 	}
 
 	def PLATFORMS_DEPLOY = [
