@@ -44,10 +44,16 @@ def call(Map addonParams = [:])
 		'windows-x86_64'
 	]
 	def UBUNTU_DISTS = [
-		'focal',
-		'eoan',
-		'bionic',
-		'xenial'
+		'stable': [
+			'focal',
+			'bionic',
+			'xenial'
+		],
+		'nightly': [
+			'groovy',
+			'focal',
+			'bionic'
+		]
 	]
 	def PPAS_VALID = [
 		'nightly': 'ppa:team-xbmc/xbmc-nightly',
@@ -60,6 +66,10 @@ def call(Map addonParams = [:])
 		'Matrix': 'nightly',
 	]
 
+	def ubuntu_distlist = []
+	UBUNTU_DISTS.each{ _, dists -> ubuntu_distlist.addAll(dists)}
+	def all_ubuntu_dists = ubuntu_distlist.unique().join(',')
+
 	properties([
 		buildDiscarder(logRotator(artifactDaysToKeepStr: '', artifactNumToKeepStr: '', daysToKeepStr: '', numToKeepStr: '5')),
 		disableConcurrentBuilds(),
@@ -71,7 +81,7 @@ def call(Map addonParams = [:])
 		parameters([
 			extendedChoice('deployPlatforms', PLATFORMS_DEPLOY.join(','), PLATFORMS_DEPLOY.join(','), 'Platforms to deploy, deploy param from Jenkinsfile is always respected'),
 			extendedChoice('PPA', PPAS_VALID.keySet().join(',')+',auto', 'auto', 'PPA to use'),
-			extendedChoice('dists', UBUNTU_DISTS.join(','), UBUNTU_DISTS.join(','), 'Ubuntu version to build for'),
+			extendedChoice('dists', all_ubuntu_dists, all_ubuntu_dists, 'Ubuntu version to build for'),
 			string(defaultValue: '1', description: 'debian package revision tag', name: 'TAGREV', trim: true),
 			booleanParam(defaultValue: false, description: 'Force upload to PPA', name: 'force_ppa_upload')
 		])
@@ -251,7 +261,9 @@ exit \$RET_VALUE
 					ws("workspace/binary-addons/kodi-${platform}-${version}")
 					{
 						def packageversion
-						def dists = params.dists.tokenize(',')
+						def dists = []
+						def given_dists = params.dists.tokenize(',')
+						given_dists.collect{d -> if (UBUNTU_DISTS[PPA_VERSION_MAP[version]].contains(d)) dists.add(d)}
 						def ppas = params.PPA == "auto" ? [PPAS_VALID[PPA_VERSION_MAP[version]]] : []
 						if (ppas.size() == 0)
 						{
