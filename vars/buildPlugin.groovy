@@ -45,6 +45,7 @@ def call(Map addonParams = [:])
 	]
 	def UBUNTU_DISTS = [
 		'stable': [
+			'groovy',
 			'focal',
 			'bionic',
 			'xenial'
