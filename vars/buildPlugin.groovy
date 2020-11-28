@@ -122,102 +122,108 @@ def call(Map addonParams = [:])
 				{
 					ws("workspace/binary-addons/kodi-${platform}-${version}")
 					{
-						stage("prepare (${platform})")
+						String buildResult = 'UNKNOWN'
+
+						try
 						{
-							pwd = pwd()
-							kodiBranch = version == "Matrix" ? "master" : version
-							checkout([
-								changelog: false,
-								scm: [
-									$class: 'GitSCM',
-									branches: [[name: "*/${kodiBranch}"]],
-									doGenerateSubmoduleConfigurations: false,
-									extensions: [[$class: 'CloneOption', timeout: 20, honorRefspec: true, noTags: true, reference: "${pwd}/../../kodi"]],
-									userRemoteConfigs: [[refspec: "+refs/heads/${kodiBranch}:refs/remotes/origin/${kodiBranch}", url: 'https://github.com/xbmc/xbmc.git']]
-								]
-							])
+							stage("prepare (${platform})")
+							{
+								pwd = pwd()
+								kodiBranch = version == "Matrix" ? "master" : version
+								checkout([
+									changelog: false,
+									scm: [
+										$class: 'GitSCM',
+										branches: [[name: "*/${kodiBranch}"]],
+										doGenerateSubmoduleConfigurations: false,
+										extensions: [[$class: 'CloneOption', timeout: 20, honorRefspec: true, noTags: true, reference: "${pwd}/../../kodi"]],
+										userRemoteConfigs: [[refspec: "+refs/heads/${kodiBranch}:refs/remotes/origin/${kodiBranch}", url: 'https://github.com/xbmc/xbmc.git']]
+									]
+								])
 
-							if (isUnix())
-							{
-								folder = PLATFORMS_VALID[platform]
-								sh "WORKSPACE=`pwd` sh -xe ./tools/buildsteps/${folder}/prepare-depends"
-								folder = PLATFORMS_VALID[platform]
-								sh "WORKSPACE=`pwd`" + (platform == 'ios-aarch64' ? ' DARWIN_ARM_CPU=arm64' : '') + " sh -xe ./tools/buildsteps/${folder}/configure-depends"
-								folder = PLATFORMS_VALID[platform]
-								sh "WORKSPACE=`pwd` sh -xe ./tools/buildsteps/${folder}/make-native-depends"
-								sh "git clean -xffd -- tools/depends/target/binary-addons"
-							}
-							else
-							{
-								folder = PLATFORMS_VALID[platform]
-								bat "tools/buildsteps/${folder}/prepare-env.bat"
-								folder = PLATFORMS_VALID[platform]
-								bat "tools/buildsteps/${folder}/download-dependencies.bat"
-								bat "git clean -xffd -- tools/depends/target/binary-addons"
-							}
-
-							dir("tools/depends/target/binary-addons/${addon}")
-							{
-								if (env.BRANCH_NAME)
+								if (isUnix())
 								{
-									def scmVars = checkout(scm)
-									currentBuild.displayName = scmVars.GIT_BRANCH + '-' + scmVars.GIT_COMMIT.substring(0, 7)
-								}
-								else if ((env.BRANCH_NAME == null) && (repo))
-								{
-									git repo
+									folder = PLATFORMS_VALID[platform]
+									sh "WORKSPACE=`pwd` sh -xe ./tools/buildsteps/${folder}/prepare-depends"
+									folder = PLATFORMS_VALID[platform]
+									sh "WORKSPACE=`pwd`" + (platform == 'ios-aarch64' ? ' DARWIN_ARM_CPU=arm64' : '') + " sh -xe ./tools/buildsteps/${folder}/configure-depends"
+									folder = PLATFORMS_VALID[platform]
+									sh "WORKSPACE=`pwd` sh -xe ./tools/buildsteps/${folder}/make-native-depends"
+									sh "git clean -xffd -- tools/depends/target/binary-addons"
 								}
 								else
 								{
-									error 'buildPlugin must be used as part of a Multibranch Pipeline *or* a `repo` argument must be provided'
+									folder = PLATFORMS_VALID[platform]
+									bat "tools/buildsteps/${folder}/prepare-env.bat"
+									folder = PLATFORMS_VALID[platform]
+									bat "tools/buildsteps/${folder}/download-dependencies.bat"
+									bat "git clean -xffd -- tools/depends/target/binary-addons"
+								}
+
+								dir("tools/depends/target/binary-addons/${addon}")
+								{
+									if (env.BRANCH_NAME)
+									{
+										def scmVars = checkout(scm)
+										currentBuild.displayName = scmVars.GIT_BRANCH + '-' + scmVars.GIT_COMMIT.substring(0, 7)
+									}
+									else if ((env.BRANCH_NAME == null) && (repo))
+									{
+										git repo
+									}
+									else
+									{
+										error 'buildPlugin must be used as part of a Multibranch Pipeline *or* a `repo` argument must be provided'
+									}
+								}
+
+								dir("tools/depends/target/binary-addons/addons/${addon}")
+								{
+									writeFile file: "${addon}.txt", text: "${addon} . ."
+									writeFile file: 'platforms.txt', text: 'all'
 								}
 							}
 
-							dir("tools/depends/target/binary-addons/addons/${addon}")
+							stage("build (${platform})")
 							{
-								writeFile file: "${addon}.txt", text: "${addon} . ."
-								writeFile file: 'platforms.txt', text: 'all'
-							}
-						}
+								dir("tools/depends/target/binary-addons")
+								{
+									if (isUnix())
+										sh "make -j $BUILDTHREADS ADDONS='${addon}' ADDONS_DEFINITION_DIR=`pwd`/addons ADDON_SRC_PREFIX=`pwd` EXTRA_CMAKE_ARGS=\"-DPACKAGE_ZIP=ON -DPACKAGE_DIR=`pwd`/../../../../cmake/addons/build/zips\" PACKAGE=1"
+								}
 
-						stage("build (${platform})")
-						{
-							dir("tools/depends/target/binary-addons")
-							{
+								if (!isUnix())
+								{
+									env.ADDONS_DEFINITION_DIR = pwd().replace('\\', '/') + '/tools/depends/target/binary-addons/addons'
+									env.ADDON_SRC_PREFIX = pwd().replace('\\', '/') + '/tools/depends/target/binary-addons'
+									folder = PLATFORMS_VALID[platform]
+									bat "tools/buildsteps/${folder}/make-addons.bat package ${addon}"
+								}
+
 								if (isUnix())
-									sh "make -j $BUILDTHREADS ADDONS='${addon}' ADDONS_DEFINITION_DIR=`pwd`/addons ADDON_SRC_PREFIX=`pwd` EXTRA_CMAKE_ARGS=\"-DPACKAGE_ZIP=ON -DPACKAGE_DIR=`pwd`/../../../../cmake/addons/build/zips\" PACKAGE=1"
+									sh "grep '${addon}' cmake/addons/.success"
+
+								buildResult = 'SUCCESS'
 							}
 
-							if (!isUnix())
+							stage("archive (${platform})")
 							{
-								env.ADDONS_DEFINITION_DIR = pwd().replace('\\', '/') + '/tools/depends/target/binary-addons/addons'
-								env.ADDON_SRC_PREFIX = pwd().replace('\\', '/') + '/tools/depends/target/binary-addons'
-								folder = PLATFORMS_VALID[platform]
-								bat "tools/buildsteps/${folder}/make-addons.bat package ${addon}"
+								archiveArtifacts artifacts: "cmake/addons/build/zips/${archiveName}+${platform}/${archiveName}-*.zip"
 							}
 
-							if (isUnix())
-								sh "grep '${addon}' cmake/addons/.success"
-						}
-
-						stage("archive (${platform})")
-						{
-							archiveArtifacts artifacts: "cmake/addons/build/zips/${archiveName}+${platform}/${archiveName}-*.zip"
-						}
-
-						stage("deploy (${platform})")
-						{
-							if (platform in deploy && env.TAG_NAME != null)
+							stage("deploy (${platform})")
 							{
-								echo "Deploying: ${addon} ${env.TAG_NAME}"
-								versionFolder = VERSIONS_VALID[version]
-								sshPublisher(
-									publishers: [
-										sshPublisherDesc(
-											configName: 'Mirrors',
-											transfers: [
-												sshTransfer(
-													execCommand: """\
+								if (platform in deploy && env.TAG_NAME != null)
+								{
+									echo "Deploying: ${addon} ${env.TAG_NAME}"
+									versionFolder = VERSIONS_VALID[version]
+									sshPublisher(
+										publishers: [
+											sshPublisherDesc(
+												configName: 'Mirrors',
+												transfers: [
+													sshTransfer(
+														execCommand: """\
 RET_VALUE=0
 mkdir -p /home/git/addons-binary/${versionFolder}
 for addonDir in \$(ls -d upload/${archiveName}+${platform})
@@ -235,14 +241,26 @@ do
 done
 exit \$RET_VALUE
 """,
-													remoteDirectory: 'upload',
-													removePrefix: 'cmake/addons/build/zips/',
-													sourceFiles: "cmake/addons/build/zips/${archiveName}+${platform}/${archiveName}-*.zip"
-												)
-											]
-										)
-									]
-								)
+														remoteDirectory: 'upload',
+														removePrefix: 'cmake/addons/build/zips/',
+														sourceFiles: "cmake/addons/build/zips/${archiveName}+${platform}/${archiveName}-*.zip"
+													)
+												]
+											)
+										]
+									)
+								}
+							}
+						}
+						catch (error)
+						{
+							buildResult  = 'FAILURE'
+						}
+						finally
+						{
+							stage("notify")
+							{
+								slackNotifier(buildResult , platform)
 							}
 						}
 					}
@@ -271,65 +289,83 @@ exit \$RET_VALUE
 							params.PPA.tokenize(',').each{p -> ppas.add(PPAS_VALID[p])}
 						}
 
-						stage("clone ${platform}")
+						String buildResult = 'UNKNOWN'
+
+						try
 						{
-							dir("${addon}")
+							stage("clone ${platform}")
 							{
-								if (env.BRANCH_NAME)
+								dir("${addon}")
 								{
-									def scmVars = checkout(scm)
-									currentBuild.displayName = scmVars.GIT_BRANCH + '-' + scmVars.GIT_COMMIT.substring(0, 7)
+									if (env.BRANCH_NAME)
+									{
+										def scmVars = checkout(scm)
+										currentBuild.displayName = scmVars.GIT_BRANCH + '-' + scmVars.GIT_COMMIT.substring(0, 7)
+									}
+									else if ((env.BRANCH_NAME == null) && (repo))
+									{
+										git repo
+									}
+									else
+									{
+										error 'buildPlugin must be used as part of a Multibranch Pipeline *or* a `repo` argument must be provided'
+									}
 								}
-								else if ((env.BRANCH_NAME == null) && (repo))
+							}
+
+							stage("build ${platform}")
+							{
+								if (params.force_ppa_upload)
 								{
-									git repo
+									sh "rm -f kodi-*.changes kodi-*.build kodi-*.upload"
 								}
-								else
+
+								dir("${addon}")
 								{
-									error 'buildPlugin must be used as part of a Multibranch Pipeline *or* a `repo` argument must be provided'
+									echo "Ubuntu dists enabled: ${dists} - TAGREV: ${params.TAGREV} - PPA: ${params.PPA}"
+									def addonsxml = readFile "${addon}/addon.xml.in"
+									packageversion = getVersion(addonsxml)
+									echo "Detected PackageVersion: ${packageversion}"
+									def changelogin = readFile 'debian/changelog.in'
+									def origtarball = 'kodi-' + addon.replace('.', '-') + "_${packageversion}.orig.tar.gz"
+
+									sh "git archive --format=tar.gz -o ../${origtarball} HEAD"
+
+									for (dist in dists)
+									{
+										echo "Building debian-source package for ${dist}"
+										def changelog = changelogin.replace('#PACKAGEVERSION#', packageversion).replace('#TAGREV#', params.TAGREV).replace('#DIST#', dist)
+										writeFile file: "debian/changelog", text: "${changelog}"
+										sh "debuild -d -S -k'jenkins (jenkins build bot) <jenkins@kodi.tv>'"
+									}
+								}
+
+								buildResult = 'SUCCESS'
+							}
+
+							stage("deploy ${platform}")
+							{
+								if (env.TAG_NAME != null || params.force_ppa_upload)
+								{
+									def force = params.force_ppa_upload ? '-f' : ''
+									def changespattern = 'kodi-' + addon.replace('.', '-') + "_${packageversion}-${params.TAGREV}*_source.changes"
+									for (ppa in ppas)
+									{
+										echo "Uploading ${changespattern} to ${ppa}"
+										sh "dput ${force} ${ppa} ${changespattern}"
+									}
 								}
 							}
 						}
-
-						stage("build ${platform}")
+						catch (error)
 						{
-							if (params.force_ppa_upload)
-							{
-								sh "rm -f kodi-*.changes kodi-*.build kodi-*.upload"
-							}
-
-							dir("${addon}")
-							{
-								echo "Ubuntu dists enabled: ${dists} - TAGREV: ${params.TAGREV} - PPA: ${params.PPA}"
-								def addonsxml = readFile "${addon}/addon.xml.in"
-								packageversion = getVersion(addonsxml)
-								echo "Detected PackageVersion: ${packageversion}"
-								def changelogin = readFile 'debian/changelog.in'
-								def origtarball = 'kodi-' + addon.replace('.', '-') + "_${packageversion}.orig.tar.gz"
-
-								sh "git archive --format=tar.gz -o ../${origtarball} HEAD"
-
-								for (dist in dists)
-								{
-									echo "Building debian-source package for ${dist}"
-									def changelog = changelogin.replace('#PACKAGEVERSION#', packageversion).replace('#TAGREV#', params.TAGREV).replace('#DIST#', dist)
-									writeFile file: "debian/changelog", text: "${changelog}"
-									sh "debuild -d -S -k'jenkins (jenkins build bot) <jenkins@kodi.tv>'"
-								}
-							}
+							buildResult = 'FAILURE'
 						}
-
-						stage("deploy ${platform}")
+						finally
 						{
-							if (env.TAG_NAME != null || params.force_ppa_upload)
+							stage("notify")
 							{
-								def force = params.force_ppa_upload ? '-f' : ''
-								def changespattern = 'kodi-' + addon.replace('.', '-') + "_${packageversion}-${params.TAGREV}*_source.changes"
-								for (ppa in ppas)
-								{
-									echo "Uploading ${changespattern} to ${ppa}"
-									sh "dput ${force} ${ppa} ${changespattern}"
-								}
+								slackNotifier(buildResult, platform)
 							}
 						}
 					}
@@ -382,4 +418,21 @@ def getVersion(text)
 {
 	def matcher = text =~ /version=\"([\d.]+)\"/
 	matcher ? matcher.getAt(1)[1] : null
+}
+
+def slackNotifier(String buildResult, String platform)
+{
+	String color
+
+	def STATUS_COLORS = [
+		'SUCCESS': 'good',
+		'FAILURE': 'danger',
+		'UNSTABLE': 'warning',
+		'UNKNOWN': 'danger'
+	]
+
+	if (!buildResult)
+		buildResult = "UNKNOWN"
+
+	slackSend(channel: "#buildserver-addons", color: "${STATUS_COLORS[buildResult]}", message: "${env.JOB_NAME} #${env.BUILD_NUMBER} for ${platform} ${buildResult} (<${env.BUILD_URL}|Open>)")
 }
