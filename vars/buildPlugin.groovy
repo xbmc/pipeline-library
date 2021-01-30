@@ -223,24 +223,7 @@ def call(Map addonParams = [:])
 												configName: 'Mirrors',
 												transfers: [
 													sshTransfer(
-														execCommand: """\
-RET_VALUE=0
-mkdir -p /home/git/addons-binary/${versionFolder}
-for addonDir in \$(ls -d upload/${archiveName}+${platform})
-do
-	addonFolder=\$(echo \${addonDir} | awk '{split(\$0,a,"/"); print a[2]}')
-	chmod 444 \${addonDir}/${archiveName}.zip
-	(mv \${addonDir}/ /home/git/addons-binary/${versionFolder}/ || \
-	 cp \${addonDir}/${archiveName}-*.zip /home/git/addons-binary/${versionFolder}/\${addonFolder}/) 2> /dev/null
-	PUBLISHED=\$?
-	if [ \$PUBLISHED -ne 0 ]; then
-		echo `ls upload/\${addonFolder}/${archiveName}-*.zip | cut -d / -f 2-` was already published >&2
-		RET_VALUE=\$PUBLISHED
-	fi
-	rm -fr \${addonDir}/ 2> /dev/null
-done
-exit \$RET_VALUE
-""",
+														execCommand: """/usr/local/bin/move_addons.sh ${archiveName} ${versionFolder} ${platform} >> jenkins-upload.log 2>&1""",
 														remoteDirectory: 'upload',
 														removePrefix: 'cmake/addons/build/zips/',
 														sourceFiles: "cmake/addons/build/zips/${archiveName}+${platform}/${archiveName}-*.zip"
