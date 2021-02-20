@@ -48,9 +48,9 @@ def call(Map addonParams = [:])
 			'groovy',
 			'focal',
 			'bionic',
-			'xenial'
 		],
 		'nightly': [
+			'hirsute',
 			'groovy',
 			'focal',
 			'bionic'
@@ -58,12 +58,11 @@ def call(Map addonParams = [:])
 	]
 	def PPAS_VALID = [
 		'nightly': 'ppa:team-xbmc/xbmc-nightly',
-		'unstable': 'ppa:team-xbmc/unstable',
 		'stable': 'ppa:team-xbmc/ppa',
 		'wsnipex-test': 'ppa:wsnipex/xbmc-addons-test'
 	]
 	def PPA_VERSION_MAP = [
-		'Leia': 'stable',
+		'Matrix': 'stable',
 		'Matrix': 'nightly',
 	]
 
