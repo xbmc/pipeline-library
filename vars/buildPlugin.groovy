@@ -219,17 +219,24 @@ def call(Map addonParams = [:])
 									sshPublisher(
 										publishers: [
 											sshPublisherDesc(
-												configName: 'Mirrors',
+												configName: 'mirrors-upload',
 												transfers: [
 													sshTransfer(
-														execCommand: """/usr/local/bin/move_addons.sh ${archiveName} ${versionFolder} ${platform} >> jenkins-upload.log 2>&1""",
-														remoteDirectory: 'upload',
 														removePrefix: 'cmake/addons/build/zips/',
 														sourceFiles: "cmake/addons/build/zips/${archiveName}+${platform}/${archiveName}-*.zip"
 													)
 												]
+											),
+											sshPublisherDesc(
+												configName: 'jenkins-move-addons',
+												transfers: [
+													sshTransfer(
+														execCommand: """jenkins-move-addons.sh ${archiveName} ${versionFolder} ${platform}"""
+												    )
+												]
 											)
 										]
+
 									)
 								}
 							}
