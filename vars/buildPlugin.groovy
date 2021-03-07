@@ -62,8 +62,10 @@ def call(Map addonParams = [:])
 		'wsnipex-test': 'ppa:wsnipex/xbmc-addons-test'
 	]
 	def PPA_VERSION_MAP = [
-		'Matrix': 'stable',
-		'Matrix': 'nightly',
+		'Matrix': [
+			'stable',
+			'nightly'
+		]
 	]
 
 	def ubuntu_distlist = []
@@ -272,7 +274,7 @@ def call(Map addonParams = [:])
 						def dists = []
 						def given_dists = params.dists.tokenize(',')
 						given_dists.collect{d -> if (UBUNTU_DISTS[PPA_VERSION_MAP[version]].contains(d)) dists.add(d)}
-						def ppas = params.PPA == "auto" ? [PPAS_VALID[PPA_VERSION_MAP[version]]] : []
+						def ppas = params.PPA == "auto" ? [PPA_VERSION_MAP[version].each{p -> PPAS_VALID[p]}].flatten() : []
 						if (ppas.size() == 0)
 						{
 							params.PPA.tokenize(',').each{p -> ppas.add(PPAS_VALID[p])}
