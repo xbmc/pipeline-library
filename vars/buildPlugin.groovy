@@ -271,9 +271,8 @@ def call(Map addonParams = [:])
 					ws("workspace/binary-addons/kodi-${platform}-${version}")
 					{
 						def packageversion
-						def dists = []
-						def given_dists = params.dists.tokenize(',')
-						given_dists.collect{d -> if (UBUNTU_DISTS[PPA_VERSION_MAP[version]].contains(d)) dists.add(d)}
+						def changespattern = [:]
+						def dists = params.dists.tokenize(',')
 						def ppas = params.PPA == "auto" ? [PPA_VERSION_MAP[version].each{p -> PPAS_VALID[p]}].flatten() : []
 						if (ppas.size() == 0)
 						{
@@ -324,8 +323,11 @@ def call(Map addonParams = [:])
 
 									for (dist in dists)
 									{
+										dist = dist.trim()
 										echo "Building debian-source package for ${dist}"
 										def changelog = changelogin.replace('#PACKAGEVERSION#', packageversion).replace('#TAGREV#', params.TAGREV).replace('#DIST#', dist)
+										def pattern = 'kodi-' + addon.replace('.', '-') + "_${packageversion}-${params.TAGREV}*${dist}_source.changes"
+										changespattern.put(dist, pattern)
 										writeFile file: "debian/changelog", text: "${changelog}"
 										sh "debuild -d -S -k'jenkins (jenkins build bot) <jenkins@kodi.tv>'"
 									}
@@ -339,11 +341,24 @@ def call(Map addonParams = [:])
 								if (env.TAG_NAME != null || params.force_ppa_upload)
 								{
 									def force = params.force_ppa_upload ? '-f' : ''
-									def changespattern = 'kodi-' + addon.replace('.', '-') + "_${packageversion}-${params.TAGREV}*_source.changes"
+									def done = 0
 									for (ppa in ppas)
 									{
-										echo "Uploading ${changespattern} to ${ppa}"
-										sh "dput ${force} ${ppa} ${changespattern}"
+										for (dist in changespattern.keySet())
+										{
+										        if (UBUNTU_DISTS[ppa].contains(dist))
+											{
+												echo "Uploading ${changespattern[dist]} to ${PPAS_VALID[ppa]}"
+												sh "dput ${force} ${PPAS_VALID[ppa]} ${changespattern[dist]}"
+												done = done + 1
+
+												if (ppas.size() > done)
+												{
+													echo "Deleting upload log ${changespattern[dist].replace("changes", "ppa.upload")}"
+													sh "rm -f ${changespattern[dist].replace("changes", "ppa.upload")}"
+												}
+											}
+										}
 									}
 								}
 							}
