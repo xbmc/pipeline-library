@@ -123,8 +123,6 @@ def call(Map addonParams = [:])
 				{
 					ws("workspace/binary-addons/kodi-${platform}-${version}")
 					{
-						String buildResult = 'UNKNOWN'
-
 						try
 						{
 							stage("prepare (${platform})")
@@ -204,7 +202,7 @@ def call(Map addonParams = [:])
 								if (isUnix())
 									sh "grep '${addon}' cmake/addons/.success"
 
-								buildResult = 'SUCCESS'
+								currentBuild.result = 'SUCCESS'
 							}
 
 							stage("archive (${platform})")
@@ -245,13 +243,13 @@ def call(Map addonParams = [:])
 						}
 						catch (error)
 						{
-							buildResult  = 'FAILURE'
+							currentBuild.result  = 'FAILURE'
 						}
 						finally
 						{
 							stage("notify")
 							{
-								slackNotifier(buildResult , platform)
+								slackNotifier(currentBuild.result , platform)
 							}
 						}
 					}
@@ -278,8 +276,6 @@ def call(Map addonParams = [:])
 						{
 							params.PPA.tokenize(',').each{p -> ppas.add(PPAS_VALID[p])}
 						}
-
-						String buildResult = 'UNKNOWN'
 
 						try
 						{
@@ -333,7 +329,7 @@ def call(Map addonParams = [:])
 									}
 								}
 
-								buildResult = 'SUCCESS'
+								currentBuild.result = 'SUCCESS'
 							}
 
 							stage("deploy ${platform}")
@@ -365,13 +361,13 @@ def call(Map addonParams = [:])
 						}
 						catch (error)
 						{
-							buildResult = 'FAILURE'
+							currentBuild.result = 'FAILURE'
 						}
 						finally
 						{
 							stage("notify")
 							{
-								slackNotifier(buildResult, platform)
+								slackNotifier(currentBuild.result, platform)
 							}
 						}
 					}
