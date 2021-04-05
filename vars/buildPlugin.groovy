@@ -202,6 +202,9 @@ def call(Map addonParams = [:])
 								if (isUnix())
 									sh "grep '${addon}' cmake/addons/.success"
 
+								if (fileExists("cmake/addons/.failure"))
+									error "addon build failed"
+
 								currentBuild.result = 'SUCCESS'
 							}
 
