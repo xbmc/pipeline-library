@@ -103,6 +103,8 @@ def call(Map addonParams = [:])
 
 	env.Configuration = 'Release'
 
+	currentBuild.result = 'SUCCESS'
+
 	for (int i = 0; i < platforms.size(); ++i)
 	{
 		String platform = platforms[i]
@@ -199,13 +201,14 @@ def call(Map addonParams = [:])
 									bat "tools/buildsteps/${folder}/make-addons.bat package ${addon}"
 								}
 
-								if (isUnix())
-									sh "grep '${addon}' cmake/addons/.success"
-
-								if (fileExists("cmake/addons/.failure"))
-									error "addon build failed"
-
-								currentBuild.result = 'SUCCESS'
+								if (fileExists("cmake/addons/.success"))
+								{
+									echo "Successfully built addon: ${addon}"
+								}
+								else if (fileExists("cmake/addons/.failure"))
+								{
+									error "Failed to build addon: ${addon}"
+								}
 							}
 
 							stage("archive (${platform})")
@@ -246,6 +249,7 @@ def call(Map addonParams = [:])
 						}
 						catch (error)
 						{
+							echo "Build failed: ${error}"
 							currentBuild.result  = 'FAILURE'
 						}
 						finally
@@ -331,8 +335,6 @@ def call(Map addonParams = [:])
 										sh "debuild -d -S -k'jenkins (jenkins build bot) <jenkins@kodi.tv>'"
 									}
 								}
-
-								currentBuild.result = 'SUCCESS'
 							}
 
 							stage("deploy ${platform}")
@@ -364,6 +366,7 @@ def call(Map addonParams = [:])
 						}
 						catch (error)
 						{
+							echo "Build failed: ${error}"
 							currentBuild.result = 'FAILURE'
 						}
 						finally
