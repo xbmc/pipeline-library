@@ -284,10 +284,10 @@ def call(Map addonParams = [:])
 						def packageversion
 						def changespattern = [:]
 						def dists = params.dists.tokenize(',')
-						def ppas = params.PPA == "auto" ? [PPA_VERSION_MAP[version].each{p -> PPAS_VALID[p]}].flatten() : []
+						def ppas = (params.PPA == "auto" && PPA_VERSION_MAP.containsKey(version)) ? [PPA_VERSION_MAP[version].each{p -> PPAS_VALID[p]}].flatten() : []
 						if (ppas.size() == 0)
 						{
-							params.PPA.tokenize(',').each{p -> ppas.add(PPAS_VALID[p])}
+							params.PPA.tokenize(',').each{p -> if (PPAS_VALID.containsKey(p)) ppas.add(PPAS_VALID[p])}
 						}
 
 						platformResult["${platform}"] = 'UNKNOWN'
@@ -347,7 +347,7 @@ def call(Map addonParams = [:])
 								platformResult["${platform}"] = 'SUCCESS'
 							}
 
-							if (env.TAG_NAME != null || params.force_ppa_upload)
+							if ((env.TAG_NAME != null && ppas.size() > 0) || params.force_ppa_upload)
 							{
 								stage("deploy ${platform}")
 								{
