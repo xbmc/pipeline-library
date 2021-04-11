@@ -222,9 +222,9 @@ def call(Map addonParams = [:])
 								archiveArtifacts artifacts: "cmake/addons/build/zips/${archiveName}+${platform}/${archiveName}-*.zip"
 							}
 
-							stage("deploy (${platform})")
+							if (platform in deploy && env.TAG_NAME != null)
 							{
-								if (platform in deploy && env.TAG_NAME != null)
+								stage("deploy (${platform})")
 								{
 									echo "Deploying: ${addon} ${env.TAG_NAME}"
 									versionFolder = VERSIONS_VALID[version]
@@ -244,11 +244,10 @@ def call(Map addonParams = [:])
 												transfers: [
 													sshTransfer(
 														execCommand: """jenkins-move-addons.sh ${archiveName} ${versionFolder} ${platform}"""
-												    )
+													)
 												]
 											)
 										]
-
 									)
 								}
 							}
@@ -348,9 +347,9 @@ def call(Map addonParams = [:])
 								platformResult["${platform}"] = 'SUCCESS'
 							}
 
-							stage("deploy ${platform}")
+							if (env.TAG_NAME != null || params.force_ppa_upload)
 							{
-								if (env.TAG_NAME != null || params.force_ppa_upload)
+								stage("deploy ${platform}")
 								{
 									def force = params.force_ppa_upload ? '-f' : ''
 									def done = 0
@@ -358,7 +357,7 @@ def call(Map addonParams = [:])
 									{
 										for (dist in changespattern.keySet())
 										{
-										        if (UBUNTU_DISTS[ppa].contains(dist))
+											if (UBUNTU_DISTS[ppa].contains(dist))
 											{
 												echo "Uploading ${changespattern[dist]} to ${PPAS_VALID[ppa]}"
 												sh "dput ${force} ${PPAS_VALID[ppa]} ${changespattern[dist]}"
