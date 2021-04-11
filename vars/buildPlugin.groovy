@@ -105,6 +105,8 @@ def call(Map addonParams = [:])
 
 	currentBuild.result = 'SUCCESS'
 
+	def platformResult = [:]
+
 	for (int i = 0; i < platforms.size(); ++i)
 	{
 		String platform = platforms[i]
@@ -125,6 +127,8 @@ def call(Map addonParams = [:])
 				{
 					ws("workspace/binary-addons/kodi-${platform}-${version}")
 					{
+						platformResult["${platform}"] = 'UNKNOWN'
+
 						try
 						{
 							stage("prepare (${platform})")
@@ -203,10 +207,12 @@ def call(Map addonParams = [:])
 
 								if (fileExists("cmake/addons/.success"))
 								{
+									platformResult["${platform}"] = 'SUCCESS'
 									echo "Successfully built addon: ${addon}"
 								}
 								else if (fileExists("cmake/addons/.failure"))
 								{
+									platformResult["${platform}"] = 'FAILURE'
 									error "Failed to build addon: ${addon}"
 								}
 							}
@@ -251,12 +257,13 @@ def call(Map addonParams = [:])
 						{
 							echo "Build failed: ${error}"
 							currentBuild.result  = 'FAILURE'
+							platformResult["${platform}"] = 'FAILURE'
 						}
 						finally
 						{
 							stage("notify")
 							{
-								slackNotifier(currentBuild.result , platform)
+								slackNotifier(platformResult["${platform}"], platform)
 							}
 						}
 					}
@@ -283,6 +290,8 @@ def call(Map addonParams = [:])
 						{
 							params.PPA.tokenize(',').each{p -> ppas.add(PPAS_VALID[p])}
 						}
+
+						platformResult["${platform}"] = 'UNKNOWN'
 
 						try
 						{
@@ -335,6 +344,8 @@ def call(Map addonParams = [:])
 										sh "debuild -d -S -k'jenkins (jenkins build bot) <jenkins@kodi.tv>'"
 									}
 								}
+
+								platformResult["${platform}"] = 'SUCCESS'
 							}
 
 							stage("deploy ${platform}")
@@ -368,12 +379,13 @@ def call(Map addonParams = [:])
 						{
 							echo "Build failed: ${error}"
 							currentBuild.result = 'FAILURE'
+							platformResult["${platform}"] = 'FAILURE'
 						}
 						finally
 						{
 							stage("notify")
 							{
-								slackNotifier(currentBuild.result, platform)
+								slackNotifier(platformResult["${platform}"], platform)
 							}
 						}
 					}
