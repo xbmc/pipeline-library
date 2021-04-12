@@ -103,6 +103,10 @@ def call(Map addonParams = [:])
 
 	env.Configuration = 'Release'
 
+	currentBuild.result = 'SUCCESS'
+
+	def platformResult = [:]
+
 	for (int i = 0; i < platforms.size(); ++i)
 	{
 		String platform = platforms[i]
@@ -123,6 +127,8 @@ def call(Map addonParams = [:])
 				{
 					ws("workspace/binary-addons/kodi-${platform}-${version}")
 					{
+						platformResult["${platform}"] = 'UNKNOWN'
+
 						try
 						{
 							stage("prepare (${platform})")
@@ -199,13 +205,16 @@ def call(Map addonParams = [:])
 									bat "tools/buildsteps/${folder}/make-addons.bat package ${addon}"
 								}
 
-								if (isUnix())
-									sh "grep '${addon}' cmake/addons/.success"
-
-								if (fileExists("cmake/addons/.failure"))
-									error "addon build failed"
-
-								currentBuild.result = 'SUCCESS'
+								if (fileExists("cmake/addons/.success"))
+								{
+									platformResult["${platform}"] = 'SUCCESS'
+									echo "Successfully built addon: ${addon}"
+								}
+								else if (fileExists("cmake/addons/.failure"))
+								{
+									platformResult["${platform}"] = 'FAILURE'
+									error "Failed to build addon: ${addon}"
+								}
 							}
 
 							stage("archive (${platform})")
@@ -213,9 +222,9 @@ def call(Map addonParams = [:])
 								archiveArtifacts artifacts: "cmake/addons/build/zips/${archiveName}+${platform}/${archiveName}-*.zip"
 							}
 
-							stage("deploy (${platform})")
+							if (platform in deploy && env.TAG_NAME != null)
 							{
-								if (platform in deploy && env.TAG_NAME != null)
+								stage("deploy (${platform})")
 								{
 									echo "Deploying: ${addon} ${env.TAG_NAME}"
 									versionFolder = VERSIONS_VALID[version]
@@ -235,24 +244,25 @@ def call(Map addonParams = [:])
 												transfers: [
 													sshTransfer(
 														execCommand: """jenkins-move-addons.sh ${archiveName} ${versionFolder} ${platform}"""
-												    )
+													)
 												]
 											)
 										]
-
 									)
 								}
 							}
 						}
 						catch (error)
 						{
+							echo "Build failed: ${error}"
 							currentBuild.result  = 'FAILURE'
+							platformResult["${platform}"] = 'FAILURE'
 						}
 						finally
 						{
 							stage("notify")
 							{
-								slackNotifier(currentBuild.result , platform)
+								slackNotifier(platformResult["${platform}"], platform)
 							}
 						}
 					}
@@ -274,11 +284,13 @@ def call(Map addonParams = [:])
 						def packageversion
 						def changespattern = [:]
 						def dists = params.dists.tokenize(',')
-						def ppas = params.PPA == "auto" ? [PPA_VERSION_MAP[version].each{p -> PPAS_VALID[p]}].flatten() : []
+						def ppas = (params.PPA == "auto" && PPA_VERSION_MAP.containsKey(version)) ? [PPA_VERSION_MAP[version].each{p -> PPAS_VALID[p]}].flatten() : []
 						if (ppas.size() == 0)
 						{
-							params.PPA.tokenize(',').each{p -> ppas.add(PPAS_VALID[p])}
+							params.PPA.tokenize(',').each{p -> if (PPAS_VALID.containsKey(p)) ppas.add(PPAS_VALID[p])}
 						}
+
+						platformResult["${platform}"] = 'UNKNOWN'
 
 						try
 						{
@@ -332,12 +344,12 @@ def call(Map addonParams = [:])
 									}
 								}
 
-								currentBuild.result = 'SUCCESS'
+								platformResult["${platform}"] = 'SUCCESS'
 							}
 
-							stage("deploy ${platform}")
+							if ((env.TAG_NAME != null && ppas.size() > 0) || params.force_ppa_upload)
 							{
-								if (env.TAG_NAME != null || params.force_ppa_upload)
+								stage("deploy ${platform}")
 								{
 									def force = params.force_ppa_upload ? '-f' : ''
 									def done = 0
@@ -345,7 +357,7 @@ def call(Map addonParams = [:])
 									{
 										for (dist in changespattern.keySet())
 										{
-										        if (UBUNTU_DISTS[ppa].contains(dist))
+											if (UBUNTU_DISTS[ppa].contains(dist))
 											{
 												echo "Uploading ${changespattern[dist]} to ${PPAS_VALID[ppa]}"
 												sh "dput ${force} ${PPAS_VALID[ppa]} ${changespattern[dist]}"
@@ -364,13 +376,15 @@ def call(Map addonParams = [:])
 						}
 						catch (error)
 						{
+							echo "Build failed: ${error}"
 							currentBuild.result = 'FAILURE'
+							platformResult["${platform}"] = 'FAILURE'
 						}
 						finally
 						{
 							stage("notify")
 							{
-								slackNotifier(currentBuild.result, platform)
+								slackNotifier(platformResult["${platform}"], platform)
 							}
 						}
 					}
