@@ -9,6 +9,7 @@ def call(Map addonParams = [:])
 	def VERSIONS_VALID = [
 		'Leia': 'leia',
 		'Matrix': 'matrix',
+		'Nexus': 'nexus',
 	]
 
 	def version = addonParams.containsKey('version') && addonParams.version in VERSIONS_VALID ? addonParams.version : VERSIONS_VALID.keySet()[0]
@@ -64,7 +65,9 @@ def call(Map addonParams = [:])
 	def PPA_VERSION_MAP = [
 		'Matrix': [
 			'stable',
-			'nightly'
+		],
+		'Nexus': [
+			'nightly',
 		]
 	]
 
@@ -77,7 +80,7 @@ def call(Map addonParams = [:])
 		disableConcurrentBuilds(),
 		disableResume(),
 		durabilityHint('PERFORMANCE_OPTIMIZED'),
-		pipelineTriggers(env.BRANCH_NAME == 'Matrix' ? [cron('@weekly')] : null),
+		pipelineTriggers(env.BRANCH_NAME == 'Nexus' ? [cron('@weekly')] : null),
 		[$class: 'RebuildSettings', autoRebuild: false, rebuildDisabled: true],
 		[$class: 'ThrottleJobProperty', categories: [], limitOneJobWithMatchingParams: false, maxConcurrentPerNode: 0, maxConcurrentTotal: 1, paramsToUseForLimit: '', throttleEnabled: true, throttleOption: 'category'],
 		parameters([
@@ -134,7 +137,7 @@ def call(Map addonParams = [:])
 							stage("prepare (${platform})")
 							{
 								pwd = pwd()
-								kodiBranch = version == "Matrix" ? "master" : version
+								kodiBranch = version == "Nexus" ? "master" : version
 								checkout([
 									changelog: false,
 									scm: [
