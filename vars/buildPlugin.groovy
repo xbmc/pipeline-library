@@ -46,14 +46,14 @@ def call(Map addonParams = [:])
 	]
 	def UBUNTU_DISTS = [
 		'stable': [
+			'impish',
 			'hirsute',
-			'groovy',
 			'focal',
 			'bionic',
 		],
 		'nightly': [
+			'impish',
 			'hirsute',
-			'groovy',
 			'focal',
 			'bionic'
 		]
