@@ -286,6 +286,7 @@ def call(Map addonParams = [:])
 					ws("workspace/binary-addons/kodi-${platform}-${version}")
 					{
 						def packageversion
+						def epoch = 6
 						def changespattern = [:]
 						def dists = params.dists.tokenize(',')
 						def ppas = (params.PPA == "auto" && PPA_VERSION_MAP.containsKey(version)) ? [PPA_VERSION_MAP[version].each{p -> PPAS_VALID[p]}].flatten() : []
@@ -330,6 +331,7 @@ def call(Map addonParams = [:])
 									echo "Ubuntu dists enabled: ${dists} - TAGREV: ${params.TAGREV} - PPA: ${params.PPA}"
 									def addonsxml = readFile "${addon}/addon.xml.in"
 									packageversion = getVersion(addonsxml)
+									debversion = epoch + ":" + packageversion
 									echo "Detected PackageVersion: ${packageversion}"
 									def changelogin = readFile 'debian/changelog.in'
 									def origtarball = 'kodi-' + addon.replace('.', '-') + "_${packageversion}.orig.tar.gz"
@@ -340,7 +342,7 @@ def call(Map addonParams = [:])
 									{
 										dist = dist.trim()
 										echo "Building debian-source package for ${dist}"
-										def changelog = changelogin.replace('#PACKAGEVERSION#', packageversion).replace('#TAGREV#', params.TAGREV).replace('#DIST#', dist)
+										def changelog = changelogin.replace('#PACKAGEVERSION#', debversion).replace('#TAGREV#', params.TAGREV).replace('#DIST#', dist)
 										def pattern = 'kodi-' + addon.replace('.', '-') + "_${packageversion}-${params.TAGREV}*${dist}_source.changes"
 										changespattern.put(dist, pattern)
 										writeFile file: "debian/changelog", text: "${changelog}"
