@@ -336,6 +336,13 @@ def call(Map addonParams = [:])
 									def changelogin = readFile 'debian/changelog.in'
 									def origtarball = 'kodi-' + addon.replace('.', '-') + "_${packageversion}.orig.tar.gz"
 
+									if(addonParams.containsKey('ppa_depends_tarballs'))
+									{
+										for (dep in addonParams.ppa_depends_tarballs)
+										{
+											sh "curl -sf `awk '{print \$2}' depends/common/${dep}/${dep}.txt` -o ${dep}.tar.gz"
+										}
+									}
 									sh "git archive --format=tar.gz -o ../${origtarball} HEAD"
 
 									for (dist in dists)
