@@ -292,7 +292,7 @@ def call(Map addonParams = [:])
 						def ppas = (params.PPA == "auto" && PPA_VERSION_MAP.containsKey(version)) ? [PPA_VERSION_MAP[version].each{p -> PPAS_VALID[p]}].flatten() : []
 						if (ppas.size() == 0)
 						{
-							params.PPA.tokenize(',').each{p -> if (PPAS_VALID.containsKey(p)) ppas.add(PPAS_VALID[p])}
+							params.PPA.tokenize(',').each{p -> if (PPAS_VALID.containsKey(p)) ppas.add(p)}
 						}
 
 						platformResult["${platform}"] = 'UNKNOWN'
@@ -335,13 +335,11 @@ def call(Map addonParams = [:])
 									echo "Detected PackageVersion: ${packageversion}"
 									def changelogin = readFile 'debian/changelog.in'
 									def origtarball = 'kodi-' + addon.replace('.', '-') + "_${packageversion}.orig.tar.gz"
+									def extratarballs = addonParams.containsKey('ppa_depends_tarballs') && addonParams.ppa_depends_tarballs != null ? addonParams.ppa_depends_tarballs : []
 
-									if(addonParams.containsKey('ppa_depends_tarballs'))
+									for (dep in extratarballs)
 									{
-										for (dep in addonParams.ppa_depends_tarballs)
-										{
-											sh "curl -sf `awk '{print \$2}' depends/common/${dep}/${dep}.txt` -o ${dep}.tar.gz"
-										}
+										sh "curl -sfL `awk '{print \$2}' depends/common/${dep}/${dep}.txt` -o ${dep}.tar.gz"
 									}
 									sh "git archive --format=tar.gz -o ../${origtarball} HEAD"
 
@@ -370,7 +368,7 @@ def call(Map addonParams = [:])
 									{
 										for (dist in changespattern.keySet())
 										{
-											if (UBUNTU_DISTS[ppa].contains(dist))
+											if (UBUNTU_DISTS[ppa] != null && UBUNTU_DISTS[ppa].contains(dist))
 											{
 												echo "Uploading ${changespattern[dist]} to ${PPAS_VALID[ppa]}"
 												sh "dput ${force} ${PPAS_VALID[ppa]} ${changespattern[dist]}"
