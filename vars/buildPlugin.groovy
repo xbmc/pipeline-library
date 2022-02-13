@@ -23,7 +23,8 @@ def call(Map addonParams = [:])
 		'tvos-aarch64': 'tvos',
 		'ubuntu-ppa': 'linux',
 		'windows-i686': 'windows/win32',
-		'windows-x86_64': 'windows/x64'
+		'windows-x86_64': 'windows/x64',
+		'flatpak-generic': 'linux'
 	]
 
 	List<String> versionsKeys = new ArrayList<String>(VERSIONS_VALID.keySet());
@@ -42,7 +43,8 @@ def call(Map addonParams = [:])
 		'osx-x86_64',
 		'ubuntu-ppa',
 		'windows-i686',
-		'windows-x86_64'
+		'windows-x86_64',
+		'flatpak-generic'
 	]
 	def UBUNTU_DISTS = [
 		'stable': [
