@@ -20,6 +20,7 @@ def call(Map addonParams = [:])
 		'ios-armv7': 'ios',
 		'ios-aarch64': 'ios',
 		'osx-x86_64': 'osx64',
+		'osx-arm64': 'osx-arm64',
 		'tvos-aarch64': 'tvos',
 		'ubuntu-ppa': 'linux',
 		'windows-i686': 'windows/win32',
@@ -35,11 +36,16 @@ def call(Map addonParams = [:])
 	{
 		PLATFORMS_VALID.remove('tvos-aarch64')
 	}
+	if (versionsKeys.indexOf(version) < versionsKeys.indexOf('Nexus'))
+	{
+		PLATFORMS_VALID.remove('osx-arm64')
+	}
 
 	def PLATFORMS_DEPLOY = [
 		'android-armv7',
 		'android-aarch64',
 		'osx-x86_64',
+		'osx-arm64',
 		'ubuntu-ppa',
 		'windows-i686',
 		'windows-x86_64'
