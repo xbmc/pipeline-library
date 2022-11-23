@@ -52,16 +52,16 @@ def call(Map addonParams = [:])
 	]
 	def UBUNTU_DISTS = [
 		'stable': [
+			'kinetic',
 			'jammy',
-			'impish',
-			'focal',
-			'bionic',
-		],
-		'nightly': [
-			'jammy',
-			'impish',
 			'focal',
 			'bionic'
+		],
+		'nightly': [
+			'lunar',
+			'kinetic',
+			'jammy',
+			'focal'
 		]
 	]
 	def PPAS_VALID = [
