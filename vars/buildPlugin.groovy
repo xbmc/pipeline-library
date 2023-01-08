@@ -10,6 +10,7 @@ def call(Map addonParams = [:])
 		'Leia': 'leia',
 		'Matrix': 'matrix',
 		'Nexus': 'nexus',
+		'Omega': 'omega',
 	]
 
 	def version = addonParams.containsKey('version') && addonParams.version in VERSIONS_VALID ? addonParams.version : VERSIONS_VALID.keySet()[0]
@@ -73,7 +74,7 @@ def call(Map addonParams = [:])
 		'Matrix': [
 			'stable',
 		],
-		'Nexus': [
+		'Omega': [
 			'nightly',
 		]
 	]
@@ -144,7 +145,7 @@ def call(Map addonParams = [:])
 							stage("prepare (${platform})")
 							{
 								pwd = pwd()
-								kodiBranch = version == "Nexus" ? "master" : version
+								kodiBranch = version == "Omega" ? "master" : version
 								checkout([
 									changelog: false,
 									scm: [
