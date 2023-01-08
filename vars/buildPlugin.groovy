@@ -74,7 +74,7 @@ def call(Map addonParams = [:])
 		'Matrix': [
 			'stable',
 		],
-		'Nexus': [
+		'Omega': [
 			'nightly',
 		]
 	]
