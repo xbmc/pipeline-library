@@ -55,8 +55,7 @@ def call(Map addonParams = [:])
 		'stable': [
 			'kinetic',
 			'jammy',
-			'focal',
-			'bionic'
+			'focal'
 		],
 		'nightly': [
 			'lunar',
@@ -71,7 +70,7 @@ def call(Map addonParams = [:])
 		'wsnipex-test': 'ppa:wsnipex/xbmc-addons-test'
 	]
 	def PPA_VERSION_MAP = [
-		'Matrix': [
+		'Nexus': [
 			'stable',
 		],
 		'Omega': [
