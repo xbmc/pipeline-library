@@ -43,6 +43,7 @@ def call(Map buildParams = [:]) {
     env.CONFIGURATION = params.Configuration == 'Release' ? 'Release' : 'Debug'
     env.BUILD_CAUSE = env.BUILD_CAUSE ?: 'manual'
     env.UPSTREAM_BUILD_CAUSE = env.UPSTREAM_BUILD_CAUSE ?: 'none'
+    def qualityGateTreshold = buildParams.containsKey('qualityGateTreshold') ? buildParams.qualityGateTreshold : 1
 
     // Globals
     def verifyHash = ''
@@ -322,7 +323,7 @@ def call(Map buildParams = [:]) {
                 script {
                     addonStatusBadge(env.WORKSPACE + '/cmake/addons/.success', env.WORKSPACE + '/cmake/addons/.failure')
                 }
-                recordIssues filters: [includeFile('xbmc/.*')], qualityGates: [[threshold: 5, type: 'TOTAL', unstable: false]], tools: [clang()]
+                recordIssues filters: [includeFile('xbmc/.*')], qualityGates: [[threshold: qualityGateTreshold, type: 'TOTAL', unstable: false]], tools: [clang()]
                 addEmbeddableBadgeConfiguration(id: '$BUILD_TAG')
             }
         }
