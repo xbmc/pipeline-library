@@ -8,6 +8,7 @@ def call(Map buildParams = [:]) {
         'Linux_arm64': 'aarch64-linux-gnu',
         'Linux_x86_64': 'x86_64-linux-gnu',
         'Ubuntu-ppa': 'linux-native',
+        'Linux_webos': 'arm-webos-linux-gnueabi'
     ]
 
     // make sure Jenkins job name starts with the platform name, e.g. Android, Linux
@@ -18,7 +19,8 @@ def call(Map buildParams = [:]) {
     // Linux
     def renderSystemsValid = ['gles', 'gl']
     def renderSystemChoices = platform =~ /Linux/ ? renderSystemsValid : 'ignored'
-// NDK_VERSION=21.4.7075529
+    def toolChain = buildParams.containsKey('toolchain_path') ? buildParams.toolchain_path : '/usr'
+
     // Android
     def ndksValid = ['21.4.7075529', '25.1.8937393']
     def ndkChoices = platform =~ /Android/ ? ndksValid : 'ignored'
@@ -57,6 +59,7 @@ def call(Map buildParams = [:]) {
     env.CONFIGEXTRA = ''
     env.filename = ''
     env.uploadFile = ''
+    env.CLITOOL = ''
 
 
     pipeline {
@@ -125,19 +128,29 @@ def call(Map buildParams = [:]) {
                                 break
                             case 'Linux_x86_64':
                                 os = 'linux'
-                                env.CONFIGEXTRA = "--with-toolchain=/usr --with-rendersystem=${renderSystem}"
+                                env.CONFIGEXTRA = "--with-toolchain=${toolChain} --with-rendersystem=${renderSystem}"
                                 verifyHash = "_${CONFIGURATION}_${renderSystem}"
                                 break
                             case 'Linux_arm':
                                 os = 'linux'
-                                env.CONFIGEXTRA = "--with-toolchain=/usr --with-rendersystem=${renderSystem}"
+                                env.CONFIGEXTRA = "--with-toolchain=${toolChain} --with-rendersystem=${renderSystem}"
                                 verifyHash = "_${CONFIGURATION}_${renderSystem}"
                                 break
                             case 'Linux_arm64':
                                 os = 'linux'
                                 env.BUILD_HOST = 'aarch64-linux-gnu'
-                                env.CONFIGEXTRA = "--with-toolchain=/usr --with-rendersystem=${renderSystem}"
+                                env.CONFIGEXTRA = "--with-toolchain=${toolChain} --with-rendersystem=${renderSystem}"
                                 verifyHash = "_${CONFIGURATION}_${renderSystem}"
+                                break
+                            case 'Linux_webos':
+                                os = 'linux'
+                                toolchain = toolChain == '/usr' ? '/home/jenkins/webos-tools/arm-webos-linux-gnueabi_sdk-buildroot' : toolChain
+                                env.CLITOOL = buildParams.containsKey('cli_path') ? buildParams.cli_path : '/home/jenkins/webos-tools/CLI/bin'
+                                env.CONFIGEXTRA = "--with-toolchain=${toolchain}"
+                                env.filename = 'org.xbmc.kodi_*_arm.ipk'
+                                uploadFileName = 'org.xbmc.kodi_BUILDREV_arm.ipk'
+                                uploadSubDir = uploadFolder == 'nightlies' ? "webos/${Revision}" : 'webos'
+                                verifyHash = "_${CONFIGURATION}_"
                                 break
                         }
                     }
@@ -283,6 +296,28 @@ def call(Map buildParams = [:]) {
                         sh '[ -f $WORKSPACE/${filename}.apk ] && mv $WORKSPACE/${filename}.apk $WORKSPACE/${uploadFile}.apk || echo "Kodi APK not found!"'
                         sh '[ -f $WORKSPACE/${filename}.aab ] && mv $WORKSPACE/${filename}.aab $WORKSPACE/${uploadFile}.aab || :'
                         publishPattern = "${uploadFile}.apk,${uploadFile}.aab"
+                        archiveArtifacts artifacts: publishPattern, followSymlinks: false
+                    }
+                }
+            }
+
+            stage('Package webos') {
+                when { equals expected: 'Linux_webos', actual: platform }
+                steps {
+                    script {
+                        sh '''
+                            export PATH=$PATH:$CLITOOL
+                            cd $WORKSPACE/build
+                            make -j$BUILDTHREADS ipk
+                        '''
+                    }
+                    script {
+                        buildRev = sh(returnStdout: true, script: 'git show -s --abbrev=8  --pretty=format:"%cs_%h"').replace('-', '').replace('_', '-')
+                        tag = env.PULLID ? 'PR' + env.PULLID : env.Revision
+                        buildTag = "${buildRev}-${tag}"
+                        env.uploadFile = uploadFileName.replace('BUILDREV', buildTag.replace('/', ''))
+                        sh '[ -f $WORKSPACE/build/${filename} ] && mv $WORKSPACE/build/${filename} $WORKSPACE/${uploadFile} || echo "Kodi IPK not found!"'
+                        publishPattern = "${uploadFile}"
                         archiveArtifacts artifacts: publishPattern, followSymlinks: false
                     }
                 }
