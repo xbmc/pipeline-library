@@ -324,7 +324,7 @@ def call(Map buildParams = [:]) {
             }
 
             stage('Upload') {
-                when { expression { return uploadArtifact } }
+                when { equals expected: true, actual: uploadArtifact }
                 steps {
                     script {
                         echo "uploading ${uploadFile}.*"
