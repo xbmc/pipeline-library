@@ -45,6 +45,7 @@ def call(Map buildParams = [:]) {
     env.CONFIGURATION = params.Configuration == 'Release' ? 'Release' : 'Debug'
     env.BUILD_CAUSE = env.BUILD_CAUSE ?: 'manual'
     env.UPSTREAM_BUILD_CAUSE = env.UPSTREAM_BUILD_CAUSE ?: 'none'
+    env.ADDONS = buildParams.containsKey('addons') ? buildParams.addons : params.ADDONS
     def qualityGateTreshold = buildParams.containsKey('qualityGateTreshold') ? buildParams.qualityGateTreshold : 1
 
     // Globals
@@ -243,7 +244,6 @@ def call(Map buildParams = [:]) {
                     script {
                         env.FAILED_BUILD_FILENAME = '.last_failed_revision'
                         env.BUILD_BINARY_ADDONS = params.BUILD_BINARY_ADDONS
-                        env.ADDONS = params.ADDONS
                         result = sh returnStdout: true, script: '''
                             echo "building binary addons: $ADDONS"
                             rm -f $WORKSPACE/cmake/.last_failed_revision
