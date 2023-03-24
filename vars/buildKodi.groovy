@@ -145,6 +145,7 @@ def call(Map buildParams = [:]) {
                                 break
                             case 'Linux_webos':
                                 os = 'linux'
+                                env.CONFIGURATION = params.Configuration == 'Default' ? 'Release' : params.Configuration
                                 toolchain = toolChain == '/usr' ? '/home/jenkins/webos-tools/arm-webos-linux-gnueabi_sdk-buildroot' : toolChain
                                 env.CLITOOL = buildParams.containsKey('cli_path') ? buildParams.cli_path : '/home/jenkins/webos-tools/CLI/bin'
                                 env.CONFIGEXTRA = "--with-toolchain=${toolchain}"
