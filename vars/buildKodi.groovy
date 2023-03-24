@@ -35,7 +35,7 @@ def call(Map buildParams = [:]) {
     def extraMount = platform =~ /Android/ ? '-v /home/jenkins/android-tools/signing:/home/jenkins/android-tools/signing:ro -v /home/jenkins/jenkins-root/workspace/.gradle:/home/jenkins/.gradle:rw' : ''
     def ccacheDir = '.ccache' + platform
 
-    def uploadArtifact = env.UPLOAD_RESULT == 'true' || env.UPLOAD_RESULT == 'True' ? true : params.UPLOAD_RESULT
+    def uploadArtifact = (env.UPLOAD_RESULT == true || env.UPLOAD_RESULT == 'true' || env.UPLOAD_RESULT == 'True') ? true : params.UPLOAD_RESULT
     def uploadFolder = env.BUILD_CAUSE == 'TIMERTRIGGER' || env.UPSTREAM_BUILD_CAUSE == 'TIMERTRIGGER' ? 'nightlies' : 'test-builds'
 
     // Build Job vars
