@@ -161,12 +161,14 @@ def call(Map buildParams = [:]) {
             stage('Checkout Scm') {
                 steps {
                     script {
+                        env.GITHUB_REPO = params.GITHUB_REPO.trim()
+
                         if (env.ghprbPullId && env.ghprbPullId != 'null') {
-                            env.PULLID = env.ghprbPullId
+                            env.PULLID = env.ghprbPullId.trim()
                             echo "setting PULLID to ghprbPullId: ${PULLID}"
                         }
                         else if (params.PR) {
-                            env.PULLID = params.PR
+                            env.PULLID = params.PR.trim()
                             echo "setting PULLID to params.PR: ${PULLID}"
                         }
                         if (env.PULLID) {
