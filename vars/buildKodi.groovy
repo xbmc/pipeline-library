@@ -38,6 +38,8 @@ def call(Map buildParams = [:]) {
     def uploadArtifact = (env.UPLOAD_RESULT == true || env.UPLOAD_RESULT == 'true' || env.UPLOAD_RESULT == 'True') ? true : params.UPLOAD_RESULT
     def uploadFolder = env.BUILD_CAUSE == 'TIMERTRIGGER' || env.UPSTREAM_BUILD_CAUSE == 'TIMERTRIGGER' ? 'nightlies' : 'test-builds'
 
+    def defaultAddons = buildParams.containsKey('binary_addons') ? buildParams.binary_addons : 'peripheral.joystick'
+
     // Build Job vars
     env.BUILDTHREADS = buildParams.containsKey('buildthreads') && buildParams.buildthreads <= 64 ? buildParams.buildthreads : 64
     env.WORKSPACESUFFIX = platform =~ /Linux/ ? platform.toLowerCase() + renderSystem : ''
@@ -77,7 +79,7 @@ def call(Map buildParams = [:]) {
             choice(name: 'RENDERSYSTEM', choices: renderSystemChoices, description: 'Linux only: Render system to build for')
             choice(name: 'NDK', choices: ndkChoices, description: 'Android only: android NDK')
             booleanParam(name: 'BUILD_BINARY_ADDONS', defaultValue: true, description: 'Whether binary addons should be built during or not.')
-            string(name: 'ADDONS', defaultValue: '^peripheral\\.joystick$', description: 'Which binary addons should be built.')
+            string(name: 'ADDONS', defaultValue: defaultAddons, description: 'Which binary addons should be built.')
             booleanParam(name: 'RUN_TEST', defaultValue: false, description: 'Turn this on if you want to build and run the xbmc unit tests based on  gtest.')
             booleanParam(name: 'UPLOAD_RESULT', defaultValue: false, description: 'Whether the resulting builds should be uploaded to test-builds')
             string(name: 'PR', defaultValue: null, description: 'Pull Request to build. Overrides Revision, empty for normal build')
@@ -246,12 +248,11 @@ def call(Map buildParams = [:]) {
                 steps {
                     script {
                         env.FAILED_BUILD_FILENAME = '.last_failed_revision'
-                        env.BUILD_BINARY_ADDONS = params.BUILD_BINARY_ADDONS
                         result = sh returnStdout: true, script: '''
                             echo "building binary addons: $ADDONS"
                             rm -f $WORKSPACE/cmake/.last_failed_revision
                             cd $WORKSPACE/tools/depends/target/binary-addons
-                            make -j$BUILDTHREADS ADDONS=$ADDONS V=1 VERBOSE=1
+                            make -j$BUILDTHREADS ADDONS="$ADDONS" V=1 VERBOSE=1
                           '''
 
                         hashStr = rev.trim() + verifyHash
