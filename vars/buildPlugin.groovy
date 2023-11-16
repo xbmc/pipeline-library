@@ -53,13 +53,11 @@ def call(Map addonParams = [:])
 	]
 	def UBUNTU_DISTS = [
 		'stable': [
-			'kinetic',
 			'jammy',
 			'focal'
 		],
 		'nightly': [
 			'lunar',
-			'kinetic',
 			'jammy',
 			'focal'
 		]
