@@ -23,7 +23,7 @@ def call(Map addonParams = [:])
 		'osx-x86_64': 'osx64',
 		'osx-arm64': 'osx-arm64',
 		'tvos-aarch64': 'tvos',
-		'ubuntu-ppa': 'linux',
+		/** disable for now, until maintained again: 'ubuntu-ppa': 'linux', */
 		'windows-i686': 'windows/win32',
 		'windows-x86_64': 'windows/x64'
 	]
@@ -47,7 +47,7 @@ def call(Map addonParams = [:])
 		'android-aarch64',
 		'osx-x86_64',
 		'osx-arm64',
-		'ubuntu-ppa',
+		/** disable for now, until maintained again: 'ubuntu-ppa', */
 		'windows-i686',
 		'windows-x86_64'
 	]
