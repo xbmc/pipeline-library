@@ -212,7 +212,14 @@ def call(Map addonParams = [:])
 									env.ADDONS_DEFINITION_DIR = pwd().replace('\\', '/') + '/tools/depends/target/binary-addons/addons'
 									env.ADDON_SRC_PREFIX = pwd().replace('\\', '/') + '/tools/depends/target/binary-addons'
 									folder = PLATFORMS_VALID[platform]
-									bat "tools/buildsteps/${folder}/make-addons.bat package ${addon}"
+									bat """
+									  set MAXTHREADS=24
+									  set TEMP=project/BuildDependencies/scripts/tmp
+									  set TMP=project/BuildDependencies/scripts/tmp
+									  set TMPDIR=project/BuildDependencies/scripts/tmp
+									  set _MSPDBSRV_ENDPOINT_=${BUILD_TAG}
+									  tools/buildsteps/${folder}/make-addons.bat package ${addon}
+									"""
 								}
 
 								if (fileExists("cmake/addons/.success"))
