@@ -22,7 +22,7 @@ def call(Map buildParams = [:]) {
     def toolChain = buildParams.containsKey('toolchain_path') ? buildParams.toolchain_path : '/usr'
 
     // Android
-    def ndksValid = ['21.4.7075529', '25.1.8937393']
+    def ndksValid = ['21.4.7075529', '26.2.11394342']
     def ndkChoices = platform =~ /Android/ ? ndksValid : 'ignored'
     def ndkVer = env.NDK_VERSION ?: (buildParams.containsKey('ndk_version') ? buildParams.ndk_version : params.NDK)
     def sdkPath = buildParams.containsKey('sdk_path') ? buildParams.sdk_path : '/home/jenkins/android-tools/android-sdk-linux'
