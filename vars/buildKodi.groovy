@@ -22,7 +22,7 @@ def call(Map buildParams = [:]) {
     def toolChain = buildParams.containsKey('toolchain_path') ? buildParams.toolchain_path : '/usr'
 
     // Android
-    def ndksValid = ['21.4.7075529', '26.2.11394342']
+    def ndksValid = ['26.2.11394342', '21.4.7075529']
     def ndkChoices = platform =~ /Android/ ? ndksValid : 'ignored'
     def ndkVer = env.NDK_VERSION ?: (buildParams.containsKey('ndk_version') ? buildParams.ndk_version : params.NDK)
     def sdkPath = buildParams.containsKey('sdk_path') ? buildParams.sdk_path : '/home/jenkins/android-tools/android-sdk-linux'
@@ -97,10 +97,46 @@ def call(Map buildParams = [:]) {
         }
 
         stages {
+            stage('Checkout Scm') {
+                steps {
+                    script {
+                        env.GITHUB_REPO = params.GITHUB_REPO.trim()
+
+                        if (env.ghprbPullId && env.ghprbPullId != 'null') {
+                            env.PULLID = env.ghprbPullId.trim()
+                            echo "setting PULLID to ghprbPullId: ${PULLID}"
+                        }
+                        else if (params.PR) {
+                            env.PULLID = params.PR.trim()
+                            echo "setting PULLID to params.PR: ${PULLID}"
+                        }
+                        if (env.PULLID) {
+                            env.Revision = "refs/remotes/${GITHUB_REPO}/pr/${PULLID}/merge"
+                            echo "Building Pull Request: ${PULLID}, overriding Revision: ${Revision}"
+                            env.PULLREFSPEC = "+refs/pull/${PULLID}/*:refs/remotes/origin/pr/${PULLID}/* +refs/pull/${PULLID}/*:refs/remotes/${GITHUB_REPO}/pr/${PULLID}/*"
+                        }
+                        echo "Building host: ${BUILD_HOST}  config: ${CONFIGURATION} revision: ${Revision} repo: ${GITHUB_REPO}"
+                    }
+                    checkout(
+                        [$class: 'GitSCM', branches: [[name: "${Revision}"]],
+                        browser: [$class: 'GithubWeb', repoUrl: "https://github.com/${GITHUB_REPO}/xbmc/"],
+                            extensions: [[$class: 'CloneOption', noTags: false, reference: '$WORKSPACE/../kodi', shallow: false, timeout: 120],
+                            [$class: 'CheckoutOption', timeout: 120], [$class: 'PruneStaleBranch']],
+                            userRemoteConfigs: [[credentialsId: 'github-app-xbmc',
+                                refspec: "+refs/heads/*:refs/remotes/origin/* +refs/heads/*:refs/remotes/${GITHUB_REPO}/* ${PULLREFSPEC}",
+                                url: "https://github.com/${GITHUB_REPO}/xbmc.git"]]
+                        ])
+                }
+            }
+
             stage('Environment setup') {
                 steps {
                     script {
                         env.BUILD_HOST = platformsValid[platform]
+                        defenv = readFile(file: "${WORKSPACE}/tools/buildsteps/defaultenv")
+                        if (isNdk21(defenv)) {
+                            ndkVer = '21.4.7075529'
+                        }
                         switch (platform) {
                             case 'Android_arm':
                                 os = 'android'
@@ -158,37 +194,6 @@ def call(Map buildParams = [:]) {
                                 break
                         }
                     }
-                }
-            }
-            stage('Checkout Scm') {
-                steps {
-                    script {
-                        env.GITHUB_REPO = params.GITHUB_REPO.trim()
-
-                        if (env.ghprbPullId && env.ghprbPullId != 'null') {
-                            env.PULLID = env.ghprbPullId.trim()
-                            echo "setting PULLID to ghprbPullId: ${PULLID}"
-                        }
-                        else if (params.PR) {
-                            env.PULLID = params.PR.trim()
-                            echo "setting PULLID to params.PR: ${PULLID}"
-                        }
-                        if (env.PULLID) {
-                            env.Revision = "refs/remotes/${GITHUB_REPO}/pr/${PULLID}/merge"
-                            echo "Building Pull Request: ${PULLID}, overriding Revision: ${Revision}"
-                            env.PULLREFSPEC = "+refs/pull/${PULLID}/*:refs/remotes/origin/pr/${PULLID}/* +refs/pull/${PULLID}/*:refs/remotes/${GITHUB_REPO}/pr/${PULLID}/*"
-                        }
-                        echo "Building host: ${BUILD_HOST}  config: ${CONFIGURATION} revision: ${Revision} repo: ${GITHUB_REPO}"
-                    }
-                    checkout(
-                        [$class: 'GitSCM', branches: [[name: "${Revision}"]],
-                        browser: [$class: 'GithubWeb', repoUrl: "https://github.com/${GITHUB_REPO}/xbmc/"],
-                            extensions: [[$class: 'CloneOption', noTags: false, reference: '$WORKSPACE/../kodi', shallow: false, timeout: 120],
-                            [$class: 'CheckoutOption', timeout: 120], [$class: 'PruneStaleBranch']],
-                            userRemoteConfigs: [[credentialsId: 'github-app-xbmc',
-                                refspec: "+refs/heads/*:refs/remotes/origin/* +refs/heads/*:refs/remotes/${GITHUB_REPO}/* ${PULLREFSPEC}",
-                                url: "https://github.com/${GITHUB_REPO}/xbmc.git"]]
-                        ])
                 }
             }
 
@@ -402,4 +407,21 @@ def addonStatusBadge(pathesSuccess, pathesFailure) {
         println 'addonsFailed: none'
     }
     println '#--------------------------------------------------#'
+}
+
+@NonCPS
+def isNdk21(defenv) {
+    try {
+        def ndk_matcher = defenv =~ /DEFAULT_NDK_VERSION="(\S\S)\S"/
+        def default_ndk = ndk_matcher[0][1]
+        println "default_ndk: ${default_ndk}"
+        if (env.NDK_VERSION != "" && default_ndk == '21') {
+            println 'Detected NDK 21 branch'
+            return true
+        }
+    }
+    catch (error) {
+        println "Error reading default NDK from tools/buildsteps/defaultenv: ${error}"
+    }
+    return false
 }
