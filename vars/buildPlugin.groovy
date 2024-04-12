@@ -144,7 +144,7 @@ def call(Map addonParams = [:])
 							stage("prepare (${platform})")
 							{
 								pwd = pwd()
-								kodiBranch = version == "Omega" ? "master" : version
+								kodiBranch = version
 								checkout([
 									changelog: false,
 									scm: [
