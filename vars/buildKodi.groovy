@@ -285,6 +285,21 @@ def call(Map buildParams = [:]) {
                 }
             }
 
+            stage('Run tests') {
+                when { equals expected: true, actual: params.RUN_TEST }
+                steps {
+                    sh '''
+                      cd $WORKSPACE/build
+                      make -j$BUILDTHREADS VERBOSE=1 kodi-test
+                      if [ "$Configuration" != "Coverage" ]; then
+                        cd $WORKSPACE;build/kodi-test --gtest_output=xml:gtestresults.xml
+                      else
+                        cd $WORKSPACE/build;GTEST_OUTPUT="xml:$WORKSPACE/gtestresults.xml" make coverage
+                      fi
+                    '''
+                }
+            }
+
             stage('Package android') {
                 when { equals expected: 'android', actual: os  }
                 steps {
