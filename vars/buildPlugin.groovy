@@ -23,7 +23,6 @@ def call(Map addonParams = [:])
 		'osx-x86_64': 'osx64',
 		'osx-arm64': 'osx-arm64',
 		'tvos-aarch64': 'tvos',
-		'ubuntu-ppa': 'linux',
 		'windows-i686': 'windows/win32',
 		'windows-x86_64': 'windows/x64'
 	]
@@ -47,40 +46,9 @@ def call(Map addonParams = [:])
 		'android-aarch64',
 		'osx-x86_64',
 		'osx-arm64',
-		'ubuntu-ppa',
 		'windows-i686',
 		'windows-x86_64'
 	]
-	def UBUNTU_DISTS = [
-		'stable': [
-			'kinetic',
-			'jammy',
-			'focal'
-		],
-		'nightly': [
-			'lunar',
-			'kinetic',
-			'jammy',
-			'focal'
-		]
-	]
-	def PPAS_VALID = [
-		'nightly': 'ppa:team-xbmc/xbmc-nightly',
-		'stable': 'ppa:team-xbmc/ppa',
-		'wsnipex-test': 'ppa:wsnipex/xbmc-addons-test'
-	]
-	def PPA_VERSION_MAP = [
-		'Nexus': [
-			'stable',
-		],
-		'Omega': [
-			'nightly',
-		]
-	]
-
-	def ubuntu_distlist = []
-	UBUNTU_DISTS.each{ _, dists -> ubuntu_distlist.addAll(dists)}
-	def all_ubuntu_dists = ubuntu_distlist.unique().join(',')
 
 	properties([
 		buildDiscarder(logRotator(artifactDaysToKeepStr: '', artifactNumToKeepStr: '', daysToKeepStr: '', numToKeepStr: '5')),
@@ -92,10 +60,7 @@ def call(Map addonParams = [:])
 		[$class: 'ThrottleJobProperty', categories: [], limitOneJobWithMatchingParams: false, maxConcurrentPerNode: 0, maxConcurrentTotal: 1, paramsToUseForLimit: '', throttleEnabled: true, throttleOption: 'category'],
 		parameters([
 			extendedChoice('deployPlatforms', PLATFORMS_DEPLOY.join(','), PLATFORMS_DEPLOY.join(','), 'Platforms to deploy, deploy param from Jenkinsfile is always respected'),
-			extendedChoice('PPA', PPAS_VALID.keySet().join(',')+',auto', 'auto', 'PPA to use'),
-			extendedChoice('dists', all_ubuntu_dists, all_ubuntu_dists, 'Ubuntu version to build for'),
 			string(defaultValue: '1', description: 'debian package revision tag', name: 'TAGREV', trim: true),
-			booleanParam(defaultValue: false, description: 'Force upload to PPA', name: 'force_ppa_upload')
 		])
 	])
 
@@ -127,8 +92,6 @@ def call(Map addonParams = [:])
 			ThrottleJobProperty.fetchDescriptor().getCategories().add(new ThrottleJobProperty.ThrottleCategory(category, 1, 0, null));
 			ThrottleJobProperty.fetchDescriptor().save()
 		}
-
-		if (platform == 'ubuntu-ppa') continue
 
 		tasks[platform] = {
 			throttle(["binary-addons/${platform}-${version}"])
@@ -281,134 +244,6 @@ def call(Map addonParams = [:])
 		}
 	}
 
-	if ("ubuntu-ppa" in platforms && "ubuntu-ppa" in deploy)
-	{
-		platform = "ubuntu-ppa"
-		tasks[platform] = {
-			throttle(["binary-addons/${platform}-${version}"])
-			{
-				node(PLATFORMS_VALID[platform])
-				{
-					ws("workspace/binary-addons/kodi-${platform}-${version}")
-					{
-						def packageversion
-						def epoch = 6
-						def changespattern = [:]
-						def dists = params.dists.tokenize(',')
-						def ppas = (params.PPA == "auto" && PPA_VERSION_MAP.containsKey(version)) ? [PPA_VERSION_MAP[version].each{p -> PPAS_VALID[p]}].flatten() : []
-						if (ppas.size() == 0)
-						{
-							params.PPA.tokenize(',').each{p -> if (PPAS_VALID.containsKey(p)) ppas.add(p)}
-						}
-
-						platformResult["${platform}"] = 'UNKNOWN'
-
-						try
-						{
-							stage("clone ${platform}")
-							{
-								dir("${addon}")
-								{
-									if (env.BRANCH_NAME)
-									{
-										def scmVars = checkout(scm)
-										currentBuild.displayName = scmVars.GIT_BRANCH + '-' + scmVars.GIT_COMMIT.substring(0, 7)
-									}
-									else if ((env.BRANCH_NAME == null) && (repo))
-									{
-										git repo
-									}
-									else
-									{
-										error 'buildPlugin must be used as part of a Multibranch Pipeline *or* a `repo` argument must be provided'
-									}
-								}
-							}
-
-							stage("build ${platform}")
-							{
-								if (params.force_ppa_upload)
-								{
-									sh "rm -f kodi-*.changes kodi-*.build kodi-*.upload"
-								}
-
-								dir("${addon}")
-								{
-									echo "Ubuntu dists enabled: ${dists} - TAGREV: ${params.TAGREV} - PPA: ${params.PPA}"
-									def addonsxml = readFile "${addon}/addon.xml.in"
-									packageversion = getVersion(addonsxml)
-									debversion = epoch + ":" + packageversion
-									echo "Detected PackageVersion: ${packageversion}"
-									def changelogin = readFile 'debian/changelog.in'
-									def origtarball = 'kodi-' + addon.replace('.', '-') + "_${packageversion}.orig.tar.gz"
-									def extratarballs = addonParams.containsKey('ppa_depends_tarballs') && addonParams.ppa_depends_tarballs != null ? addonParams.ppa_depends_tarballs : []
-
-									for (dep in extratarballs)
-									{
-										sh "curl -sfL `awk '{print \$2}' depends/common/${dep}/${dep}.txt` -o ${dep}.tar.gz"
-									}
-									sh "git archive --format=tar.gz -o ../${origtarball} HEAD"
-
-									for (dist in dists)
-									{
-										dist = dist.trim()
-										echo "Building debian-source package for ${dist}"
-										def changelog = changelogin.replace('#PACKAGEVERSION#', debversion).replace('#TAGREV#', params.TAGREV).replace('#DIST#', dist)
-										def pattern = 'kodi-' + addon.replace('.', '-') + "_${packageversion}-${params.TAGREV}*${dist}_source.changes"
-										changespattern.put(dist, pattern)
-										writeFile file: "debian/changelog", text: "${changelog}"
-										sh "debuild -d -S -k'jenkins (jenkins build bot) <jenkins@kodi.tv>'"
-									}
-								}
-
-								platformResult["${platform}"] = 'SUCCESS'
-							}
-
-							if ((env.TAG_NAME != null && ppas.size() > 0) || params.force_ppa_upload)
-							{
-								stage("deploy ${platform}")
-								{
-									def force = params.force_ppa_upload ? '-f' : ''
-									def done = 0
-									for (ppa in ppas)
-									{
-										for (dist in changespattern.keySet())
-										{
-											if (UBUNTU_DISTS[ppa] != null && UBUNTU_DISTS[ppa].contains(dist))
-											{
-												echo "Uploading ${changespattern[dist]} to ${PPAS_VALID[ppa]}"
-												sh "dput ${force} ${PPAS_VALID[ppa]} ${changespattern[dist]}"
-												done = done + 1
-
-												if (ppas.size() > done)
-												{
-													echo "Deleting upload log ${changespattern[dist].replace("changes", "ppa.upload")}"
-													sh "rm -f ${changespattern[dist].replace("changes", "ppa.upload")}"
-												}
-											}
-										}
-									}
-								}
-							}
-						}
-						catch (error)
-						{
-							echo "Build failed: ${error}"
-							currentBuild.result = 'FAILURE'
-							platformResult["${platform}"] = 'FAILURE'
-						}
-						finally
-						{
-							stage("notify")
-							{
-								slackNotifier(platformResult["${platform}"], platform)
-							}
-						}
-					}
-				}
-			}
-		}
-	}
 	parallel(tasks)
 }
 
