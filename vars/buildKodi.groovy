@@ -51,6 +51,8 @@ def call(Map buildParams = [:]) {
     env.RUN_TESTS = buildParams.containsKey('RUN_TESTS') ? buildParams.RUN_TESTS : params.RUN_TESTS
     def qualityGateThreshold = buildParams.containsKey('qualityGateThreshold') ? buildParams.qualityGateThreshold : 1
 
+    def FILTER_TESTS = buildParams.containsKey('FILTER_TESTS') ? '--gtest_filter=' + buildParams.FILTER_TESTS : ''
+
     // Globals
     def verifyHash = ''
     def os = ''
@@ -293,7 +295,7 @@ def call(Map buildParams = [:]) {
                       cd $WORKSPACE/build
                       make -j$BUILDTHREADS VERBOSE=1 kodi-test
                       if [ "$Configuration" != "Coverage" ]; then
-                        cd $WORKSPACE;build/kodi-test --gtest_output=xml:gtestresults.xml
+                        cd $WORKSPACE;build/kodi-test --gtest_output=xml:gtestresults.xml $FILTER_TESTS
                       else
                         cd $WORKSPACE/build;GTEST_OUTPUT="xml:$WORKSPACE/gtestresults.xml" make coverage
                       fi
