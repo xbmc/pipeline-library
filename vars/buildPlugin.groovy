@@ -11,6 +11,7 @@ def call(Map addonParams = [:])
 		'Matrix': 'matrix',
 		'Nexus': 'nexus',
 		'Omega': 'omega',
+		'Piers': 'piers',
 	]
 
 	def version = addonParams.containsKey('version') && addonParams.version in VERSIONS_VALID ? addonParams.version : VERSIONS_VALID.keySet()[0]
