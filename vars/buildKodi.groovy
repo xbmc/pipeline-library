@@ -48,7 +48,10 @@ def call(Map buildParams = [:]) {
     env.BUILD_CAUSE = env.BUILD_CAUSE ?: 'manual'
     env.UPSTREAM_BUILD_CAUSE = env.UPSTREAM_BUILD_CAUSE ?: 'none'
     env.ADDONS = buildParams.containsKey('addons') ? buildParams.addons : params.ADDONS
+    env.RUN_TESTS = buildParams.containsKey('RUN_TESTS') ? buildParams.RUN_TESTS : params.RUN_TESTS
     def qualityGateThreshold = buildParams.containsKey('qualityGateThreshold') ? buildParams.qualityGateThreshold : 1
+
+    def FILTER_TESTS = buildParams.containsKey('FILTER_TESTS') ? '--gtest_filter=' + buildParams.FILTER_TESTS : ''
 
     // Globals
     def verifyHash = ''
@@ -80,7 +83,7 @@ def call(Map buildParams = [:]) {
             choice(name: 'NDK', choices: ndkChoices, description: 'Android only: android NDK')
             booleanParam(name: 'BUILD_BINARY_ADDONS', defaultValue: true, description: 'Whether binary addons should be built during or not.')
             string(name: 'ADDONS', defaultValue: defaultAddons, description: 'Which binary addons should be built.')
-            booleanParam(name: 'RUN_TEST', defaultValue: false, description: 'Turn this on if you want to build and run the xbmc unit tests based on  gtest.')
+            booleanParam(name: 'RUN_TESTS', defaultValue: false, description: 'Turn this on if you want to build and run the xbmc unit tests based on  gtest.')
             booleanParam(name: 'UPLOAD_RESULT', defaultValue: false, description: 'Whether the resulting builds should be uploaded to test-builds')
             string(name: 'PR', defaultValue: null, description: 'Pull Request to build. Overrides Revision, empty for normal build')
         }
@@ -286,13 +289,13 @@ def call(Map buildParams = [:]) {
             }
 
             stage('Run tests') {
-                when { equals expected: true, actual: params.RUN_TEST }
+                when { equals expected: true, actual: env.RUN_TESTS }
                 steps {
                     sh '''
                       cd $WORKSPACE/build
                       make -j$BUILDTHREADS VERBOSE=1 kodi-test
                       if [ "$Configuration" != "Coverage" ]; then
-                        cd $WORKSPACE;build/kodi-test --gtest_output=xml:gtestresults.xml
+                        cd $WORKSPACE;build/kodi-test --gtest_output=xml:gtestresults.xml $FILTER_TESTS
                       else
                         cd $WORKSPACE/build;GTEST_OUTPUT="xml:$WORKSPACE/gtestresults.xml" make coverage
                       fi
