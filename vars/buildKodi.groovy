@@ -51,6 +51,11 @@ def call(Map buildParams = [:]) {
     env.RUN_TESTS = buildParams.containsKey('RUN_TESTS') ? buildParams.RUN_TESTS : params.RUN_TESTS
     def qualityGateThreshold = buildParams.containsKey('qualityGateThreshold') ? buildParams.qualityGateThreshold : 1
 
+    // Testing execution
+    def testablePlatforms = [
+        'Linux_x86_64'
+    ]
+    boolean allowTests = testablePlatforms.contains(platform) ? true : false
     env.FILTER_TESTS = buildParams.containsKey('FILTER_TESTS') ? '--gtest_filter=' + buildParams.FILTER_TESTS : ''
 
     // Globals
@@ -289,7 +294,10 @@ def call(Map buildParams = [:]) {
             }
 
             stage('Run tests') {
-                when { equals expected: 'true', actual: env.RUN_TESTS }
+                when {
+                  equals expected: 'true', actual: env.RUN_TESTS
+                  expression { return allowTests }
+                }
                 steps {
                     sh '''
                       cd $WORKSPACE/build
