@@ -289,7 +289,7 @@ def call(Map buildParams = [:]) {
             }
 
             stage('Run tests') {
-                when { equals expected: true, actual: env.RUN_TESTS }
+                when { equals expected: 'true', actual: env.RUN_TESTS }
                 steps {
                     sh '''
                       cd $WORKSPACE/build
