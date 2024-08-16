@@ -51,7 +51,7 @@ def call(Map buildParams = [:]) {
     env.RUN_TESTS = buildParams.containsKey('RUN_TESTS') ? buildParams.RUN_TESTS : params.RUN_TESTS
     def qualityGateThreshold = buildParams.containsKey('qualityGateThreshold') ? buildParams.qualityGateThreshold : 1
 
-    def FILTER_TESTS = buildParams.containsKey('FILTER_TESTS') ? '--gtest_filter=' + buildParams.FILTER_TESTS : ''
+    env.FILTER_TESTS = buildParams.containsKey('FILTER_TESTS') ? '--gtest_filter=' + buildParams.FILTER_TESTS : ''
 
     // Globals
     def verifyHash = ''
