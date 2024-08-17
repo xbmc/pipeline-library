@@ -52,7 +52,7 @@ def call(Map addonParams = [:])
 	]
 
 	properties([
-		buildDiscarder(logRotator(artifactDaysToKeepStr: '', artifactNumToKeepStr: '', daysToKeepStr: '', numToKeepStr: '5')),
+		buildDiscarder(logRotator(artifactDaysToKeepStr: '5', artifactNumToKeepStr: '5', daysToKeepStr: '7', numToKeepStr: '5')),
 		disableConcurrentBuilds(),
 		disableResume(),
 		durabilityHint('PERFORMANCE_OPTIMIZED'),
