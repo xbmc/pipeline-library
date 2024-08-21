@@ -48,6 +48,7 @@ def call(Map buildParams = [:]) {
     env.BUILD_CAUSE = env.BUILD_CAUSE ?: 'manual'
     env.UPSTREAM_BUILD_CAUSE = env.UPSTREAM_BUILD_CAUSE ?: 'none'
     env.ADDONS = buildParams.containsKey('addons') ? buildParams.addons : params.ADDONS
+    env.BUILD_BINARY_ADDONS = params.BUILD_BINARY_ADDONS
     env.RUN_TESTS = buildParams.containsKey('RUN_TESTS') ? buildParams.RUN_TESTS : params.RUN_TESTS
     def qualityGateThreshold = buildParams.containsKey('qualityGateThreshold') ? buildParams.qualityGateThreshold : 1
 
@@ -391,7 +392,9 @@ def call(Map buildParams = [:]) {
         post {
             always {
                 script {
-                    addonStatusBadge(env.WORKSPACE + '/cmake/addons/.success', env.WORKSPACE + '/cmake/addons/.failure')
+                    if(env.BUILD_BINARY_ADDONS == 'true') {
+                      addonStatusBadge(env.WORKSPACE + '/cmake/addons/.success', env.WORKSPACE + '/cmake/addons/.failure')
+                    }
                 }
                 recordIssues filters: [includeFile('xbmc/.*')], qualityGates: [[threshold: qualityGateThreshold, type: 'TOTAL', unstable: false]], tools: [clang()]
                 addEmbeddableBadgeConfiguration(id: '$BUILD_TAG')
