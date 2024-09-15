@@ -393,7 +393,7 @@ def call(Map buildParams = [:]) {
                 script {
                     addonStatusBadge(env.WORKSPACE + '/cmake/addons/.success', env.WORKSPACE + '/cmake/addons/.failure')
                 }
-                recordIssues filters: [includeFile('xbmc/.*')], qualityGates: [[threshold: qualityGateThreshold, type: 'TOTAL', unstable: false]], tools: [clang()]
+                recordIssues filters: [includeFile('xbmc/.*'), excludeFile('tools/depends/.*')], qualityGates: [[threshold: qualityGateThreshold, type: 'TOTAL', unstable: false]], tools: [clang()]
                 addEmbeddableBadgeConfiguration(id: '$BUILD_TAG')
             }
         }
