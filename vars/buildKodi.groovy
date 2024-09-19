@@ -64,6 +64,7 @@ def call(Map buildParams = [:]) {
     def os = ''
     def uploadFileName = ''
     def publishPattern = ''
+    def canUpload = true
     def uploadSubDir = ''
     env.BUILD_HOST = ''
     env.PULLID = ''
@@ -178,17 +179,20 @@ def call(Map buildParams = [:]) {
                                 os = 'linux'
                                 env.CONFIGEXTRA = "--with-toolchain=${toolChain} --with-rendersystem=${renderSystem}"
                                 verifyHash = "_${CONFIGURATION}_${renderSystem}"
+                                canUpload = false
                                 break
                             case 'Linux_arm':
                                 os = 'linux'
                                 env.CONFIGEXTRA = "--with-toolchain=${toolChain} --with-rendersystem=${renderSystem}"
                                 verifyHash = "_${CONFIGURATION}_${renderSystem}"
+                                canUpload = false
                                 break
                             case 'Linux_arm64':
                                 os = 'linux'
                                 env.BUILD_HOST = 'aarch64-linux-gnu'
                                 env.CONFIGEXTRA = "--with-toolchain=${toolChain} --with-rendersystem=${renderSystem}"
                                 verifyHash = "_${CONFIGURATION}_${renderSystem}"
+                                canUpload = false
                                 break
                             case 'Linux_webos':
                                 os = 'linux'
@@ -360,7 +364,12 @@ def call(Map buildParams = [:]) {
             }
 
             stage('Upload') {
-                when { equals expected: true, actual: uploadArtifact }
+                when {
+                    allOf {
+                        equals expected: true, actual: uploadArtifact
+                        equals expected: true, actual: canUpload
+                    }
+                }
                 steps {
                     script {
                         echo "uploading ${uploadFile}.*"
