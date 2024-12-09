@@ -266,20 +266,11 @@ def call(Map buildParams = [:]) {
                 steps {
                     script {
                         env.FAILED_BUILD_FILENAME = '.last_failed_revision'
-                        result = sh returnStdout: true, script: '''
-                            echo "building binary addons: $ADDONS"
-                            rm -f $WORKSPACE/cmake/.last_failed_revision
-                            cd $WORKSPACE/tools/depends/target/binary-addons
-                            make -j$BUILDTHREADS ADDONS="$ADDONS" V=1 VERBOSE=1
-                          '''
-
-                        hashStr = rev.trim() + verifyHash
-                        if (result =~ /Following Addons failed to build/ ) {
-                            writeFile file: "${WORKSPACE}/cmake/.last_failed_revision", text: "${hashStr}"
-                        }
-                        else {
-                            writeFile file: "${WORKSPACE}/cmake/.last_success_revision", text: "${hashStr}"
-                        }
+                        sh 'bash -c "\
+                            echo \\"building binary addons: $ADDONS\\" \
+                            && cd $WORKSPACE/tools/depends/target/binary-addons \
+                            && make -j$BUILDTHREADS ADDONS=\\"$ADDONS\\" V=1 VERBOSE=1 \
+                          "'
                     }
                 }
             }
