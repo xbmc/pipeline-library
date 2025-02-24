@@ -243,7 +243,7 @@ def call(Map buildParams = [:]) {
                         env.DEBUG_SWITCH = env.CONFIGURATION == 'Release' ? '--disable-debug' : '--enable-debug'
                         sh 'bash -c "\
                           cd $WORKSPACE/tools/depends \
-                          && git clean -xfd . \
+                          && git clean -f -xfd . \
                           && ./bootstrap \
                           && ./configure \
                             --with-tarballs=$TARBALLS_DIR \
