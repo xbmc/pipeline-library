@@ -23,13 +23,18 @@ def call(Map addonParams = [:])
 		'osx-arm64': 'osx-arm64',
 		'tvos-aarch64': 'tvos',
 		'windows-i686': 'windows/win32',
-		'windows-x86_64': 'windows/x64'
+		'windows-x86_64': 'windows/x64',
+		'windows-arm64': 'windows/arm64',
 	]
 
 	List<String> versionsKeys = new ArrayList<String>(VERSIONS_VALID.keySet());
 	if (versionsKeys.indexOf(version) < versionsKeys.indexOf('Nexus'))
 	{
 		PLATFORMS_VALID.remove('osx-arm64')
+	}
+	if (versionsKeys.indexOf(version) < versionsKeys.indexOf('Piers'))
+	{
+		PLATFORMS_VALID.remove('windows-arm64')
 	}
 
 	def PLATFORMS_DEPLOY = [
@@ -38,7 +43,8 @@ def call(Map addonParams = [:])
 		'osx-x86_64',
 		'osx-arm64',
 		'windows-i686',
-		'windows-x86_64'
+		'windows-x86_64',
+		'windows-arm64'
 	]
 
 	properties([
