@@ -7,7 +7,6 @@ import com.cwctravel.hudson.plugins.extended_choice_parameter.ExtendedChoicePara
 def call(Map addonParams = [:])
 {
 	def VERSIONS_VALID = [
-		'Leia': 'leia',
 		'Matrix': 'matrix',
 		'Nexus': 'nexus',
 		'Omega': 'omega',
@@ -19,7 +18,6 @@ def call(Map addonParams = [:])
 	def PLATFORMS_VALID = [
 		'android-armv7': 'android',
 		'android-aarch64': 'android-arm64-v8a',
-		'ios-armv7': 'ios',
 		'ios-aarch64': 'ios',
 		'osx-x86_64': 'osx64',
 		'osx-arm64': 'osx-arm64',
@@ -29,14 +27,6 @@ def call(Map addonParams = [:])
 	]
 
 	List<String> versionsKeys = new ArrayList<String>(VERSIONS_VALID.keySet());
-	if (versionsKeys.indexOf(version) >= versionsKeys.indexOf('Matrix'))
-	{
-		PLATFORMS_VALID.remove('ios-armv7')
-	}
-	if (versionsKeys.indexOf(version) < versionsKeys.indexOf('Matrix'))
-	{
-		PLATFORMS_VALID.remove('tvos-aarch64')
-	}
 	if (versionsKeys.indexOf(version) < versionsKeys.indexOf('Nexus'))
 	{
 		PLATFORMS_VALID.remove('osx-arm64')
@@ -125,7 +115,7 @@ def call(Map addonParams = [:])
 									folder = PLATFORMS_VALID[platform]
 									sh "WORKSPACE=`pwd` sh -xe ./tools/buildsteps/${folder}/prepare-depends"
 									folder = PLATFORMS_VALID[platform]
-									sh "WORKSPACE=`pwd`" + (platform == 'ios-aarch64' ? ' DARWIN_ARM_CPU=arm64' : '') + " sh -xe ./tools/buildsteps/${folder}/configure-depends"
+									sh "WORKSPACE=`pwd`" + " sh -xe ./tools/buildsteps/${folder}/configure-depends"
 									folder = PLATFORMS_VALID[platform]
 									sh "WORKSPACE=`pwd` sh -xe ./tools/buildsteps/${folder}/make-native-depends"
 									sh "git clean -xffd -- tools/depends/target/binary-addons"
