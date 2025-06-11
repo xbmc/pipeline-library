@@ -6,12 +6,15 @@ import com.cwctravel.hudson.plugins.extended_choice_parameter.ExtendedChoicePara
  */
 def call(Map addonParams = [:])
 {
+	// The Version from master branch of the xbmc repo has to be the last one in this list.
+	// This map has to be updated after a new version is branched in the xbmc repo.
 	def VERSIONS_VALID = [
 		'Matrix': 'matrix',
 		'Nexus': 'nexus',
 		'Omega': 'omega',
 		'Piers': 'piers',
 	]
+	def KODI_CURRENT_DEV_VERSION = VERSIONS_VALID.keySet()[-1]
 
 	def version = addonParams.containsKey('version') && addonParams.version in VERSIONS_VALID ? addonParams.version : VERSIONS_VALID.keySet()[0]
 
@@ -46,7 +49,7 @@ def call(Map addonParams = [:])
 		disableConcurrentBuilds(),
 		disableResume(),
 		durabilityHint('PERFORMANCE_OPTIMIZED'),
-		pipelineTriggers(env.BRANCH_NAME == 'Omega' ? [cron('@weekly')] : null),
+		pipelineTriggers(env.BRANCH_NAME == KODI_CURRENT_DEV_VERSION ? [cron('@weekly')] : null),
 		[$class: 'RebuildSettings', autoRebuild: false, rebuildDisabled: true],
 		[$class: 'ThrottleJobProperty', categories: [], limitOneJobWithMatchingParams: false, maxConcurrentPerNode: 0, maxConcurrentTotal: 1, paramsToUseForLimit: '', throttleEnabled: true, throttleOption: 'category'],
 		parameters([
@@ -98,7 +101,7 @@ def call(Map addonParams = [:])
 							stage("prepare (${platform})")
 							{
 								pwd = pwd()
-								kodiBranch = version == "Piers" ? "master" : version
+								kodiBranch = version == KODI_CURRENT_DEV_VERSION ? "master" : version
 								checkout([
 									changelog: false,
 									scm: [
