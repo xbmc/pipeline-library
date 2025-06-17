@@ -54,7 +54,6 @@ def call(Map addonParams = [:])
 		[$class: 'ThrottleJobProperty', categories: [], limitOneJobWithMatchingParams: false, maxConcurrentPerNode: 0, maxConcurrentTotal: 1, paramsToUseForLimit: '', throttleEnabled: true, throttleOption: 'category'],
 		parameters([
 			extendedChoice('deployPlatforms', PLATFORMS_DEPLOY.join(','), PLATFORMS_DEPLOY.join(','), 'Platforms to deploy, deploy param from Jenkinsfile is always respected'),
-			string(defaultValue: '1', description: 'debian package revision tag', name: 'TAGREV', trim: true),
 		])
 	])
 
@@ -276,13 +275,6 @@ def extendedChoice(name, choices, defaultchoice, desc)
 	        desc /* String description */,
 	        null /* String multiSelectDelimiter */
 	)
-}
-
-@NonCPS
-def getVersion(text)
-{
-	def matcher = text =~ /version=\"([\d.]+)\"/
-	matcher ? matcher.getAt(1)[1] : null
 }
 
 def slackNotifier(String buildResult, String platform)
