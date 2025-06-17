@@ -117,7 +117,7 @@ def call(Map addonParams = [:])
 									folder = PLATFORMS_VALID[platform]
 									sh "WORKSPACE=`pwd` sh -xe ./tools/buildsteps/${folder}/prepare-depends"
 									folder = PLATFORMS_VALID[platform]
-									sh "WORKSPACE=`pwd`" + " sh -xe ./tools/buildsteps/${folder}/configure-depends"
+									sh "WORKSPACE=`pwd` sh -xe ./tools/buildsteps/${folder}/configure-depends"
 									folder = PLATFORMS_VALID[platform]
 									sh "WORKSPACE=`pwd` sh -xe ./tools/buildsteps/${folder}/make-native-depends"
 									sh "git clean -xffd -- tools/depends/target/binary-addons"
