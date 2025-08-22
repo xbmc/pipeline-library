@@ -168,6 +168,7 @@ def call(Map addonParams = [:])
 								{
 									env.ADDONS_DEFINITION_DIR = pwd().replace('\\', '/') + '/tools/depends/target/binary-addons/addons'
 									env.ADDON_SRC_PREFIX = pwd().replace('\\', '/') + '/tools/depends/target/binary-addons'
+									env._MSPDBSRV_ENDPOINT_ = "${platform}-${version}"
 									folder = PLATFORMS_VALID[platform]
 									bat "tools/buildsteps/${folder}/make-addons.bat package ${addon}"
 								}
