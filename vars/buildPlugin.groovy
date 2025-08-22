@@ -157,13 +157,14 @@ def call(Map addonParams = [:])
 
 							stage("build (${platform})")
 							{
-								dir("tools/depends/target/binary-addons")
+								if (isUnix())
 								{
-									if (isUnix())
+									dir("tools/depends/target/binary-addons")
+									{
 										sh "make -j $BUILDTHREADS ADDONS='${addon}' ADDONS_DEFINITION_DIR=`pwd`/addons ADDON_SRC_PREFIX=`pwd` EXTRA_CMAKE_ARGS=\"-DPACKAGE_ZIP=ON -DPACKAGE_DIR=`pwd`/../../../../cmake/addons/build/zips\" PACKAGE=1"
+									}
 								}
-
-								if (!isUnix())
+								else
 								{
 									env.ADDONS_DEFINITION_DIR = pwd().replace('\\', '/') + '/tools/depends/target/binary-addons/addons'
 									env.ADDON_SRC_PREFIX = pwd().replace('\\', '/') + '/tools/depends/target/binary-addons'
