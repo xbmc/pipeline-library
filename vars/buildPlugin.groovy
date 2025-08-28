@@ -26,7 +26,9 @@ def call(Map addonParams = [:])
 		'osx-arm64': 'osx-arm64',
 		'tvos-aarch64': 'tvos',
 		'windows-i686': 'windows/win32',
-		'windows-x86_64': 'windows/x64'
+		'windows-x86_64': 'windows/x64',
+		'windows-i686-uwp': 'windows/win32-uwp',
+		'windows-x86_64-uwp': 'windows/x64-uwp'
 	]
 
 	List<String> versionsKeys = new ArrayList<String>(VERSIONS_VALID.keySet());
