@@ -124,6 +124,7 @@ def call(Map addonParams = [:])
 								}
 								else
 								{
+									env.USE_LESSMSI = "YES"
 									folder = PLATFORMS_VALID[platform]
 									bat "tools/buildsteps/${folder}/prepare-env.bat"
 									folder = PLATFORMS_VALID[platform]
