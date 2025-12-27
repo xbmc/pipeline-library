@@ -25,6 +25,7 @@ def call(Map addonParams = [:])
 		'osx-x86_64': 'osx64',
 		'osx-arm64': 'osx-arm64',
 		'tvos-aarch64': 'tvos',
+		'windows-arm64': 'windows/arm64',
 		'windows-i686': 'windows/win32',
 		'windows-x86_64': 'windows/x64'
 	]
@@ -34,12 +35,17 @@ def call(Map addonParams = [:])
 	{
 		PLATFORMS_VALID.remove('osx-arm64')
 	}
+	if (versionsKeys.indexOf(version) < versionsKeys.indexOf('Piers'))
+	{
+		PLATFORMS_VALID.remove('windows-arm64')
+	}
 
 	def PLATFORMS_DEPLOY = [
 		'android-armv7',
 		'android-aarch64',
 		'osx-x86_64',
 		'osx-arm64',
+		'windows-arm64',
 		'windows-i686',
 		'windows-x86_64'
 	]
