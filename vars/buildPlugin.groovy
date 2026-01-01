@@ -27,7 +27,8 @@ def call(Map addonParams = [:])
 		'tvos-aarch64': 'tvos',
 		'windows-arm64': 'windows/arm64',
 		'windows-i686': 'windows/win32',
-		'windows-x86_64': 'windows/x64'
+		'windows-x86_64': 'windows/x64',
+		'flatpak-generic': 'linux'
 	]
 
 	List<String> versionsKeys = new ArrayList<String>(VERSIONS_VALID.keySet());
@@ -47,7 +48,8 @@ def call(Map addonParams = [:])
 		'osx-arm64',
 		'windows-arm64',
 		'windows-i686',
-		'windows-x86_64'
+		'windows-x86_64',
+		'flatpak-generic'
 	]
 
 	properties([
