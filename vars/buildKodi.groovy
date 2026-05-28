@@ -32,7 +32,7 @@ def call(Map buildParams = [:]) {
     def defaultImage = platform =~ /Linux/ ? 'kodi/jenkins/linux-arm:latest' : 'kodi/jenkins/android-build:latest'
     def buildImage = buildParams.containsKey('image') ? buildParams.image : defaultImage
     def renderSystem = buildParams.containsKey('rendersystem') && renderSystemsValid.contains(buildParams.rendersystem) ? buildParams.rendersystem : params.RENDERSYSTEM
-    def extraMount = platform =~ /Android/ ? '-v /home/jenkins/android-tools/signing:/home/jenkins/android-tools/signing:ro -v /home/jenkins/jenkins-root/workspace/.gradle:/home/jenkins/.gradle:rw' : ''
+    def extraMount = platform =~ /Android/ ? "-v /home/jenkins/android-tools/signing:/home/jenkins/android-tools/signing:ro -v /home/jenkins/jenkins-root/workspace/${platform}/.gradle:/home/jenkins/.gradle:rw" : ''
     def ccacheDir = '.ccache' + platform
 
     def uploadArtifact = (env.UPLOAD_RESULT == true || env.UPLOAD_RESULT == 'true' || env.UPLOAD_RESULT == 'True') ? true : params.UPLOAD_RESULT
