@@ -12,6 +12,9 @@ def call(Map buildParams = [:]) {
         // Suggest a near-miss by edit distance, so a dropped/transposed letter
         // is caught too. Only suggest when one candidate is uniquely closest.
         def editDistance = { String a, String b ->
+            if (a.isEmpty()) {
+                return b.length()
+            }
             def prev = (0..b.length()).toList()
             (1..a.length()).each { i ->
                 def cur = [i]
