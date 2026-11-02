@@ -1,4 +1,36 @@
 def call(Map buildParams = [:]) {
+    // Named arguments are read by exact key with a per-key default, so a
+    // misspelled key is indistinguishable from an omitted one and silently
+    // falls back. Reject anything this step does not consume instead.
+    def validParams = [
+        'platform', 'rendersystem', 'toolchain_path', 'ndk_version', 'sdk_path',
+        'ndk_path', 'image', 'binary_addons', 'buildthreads', 'addons',
+        'RUN_TESTS', 'qualityGateThreshold', 'FILTER_TESTS', 'cli_path'
+    ]
+    def unusedParams = buildParams.keySet().findAll { !validParams.contains(it) }
+    if (unusedParams) {
+        // Suggest a near-miss by edit distance, so a dropped/transposed letter
+        // is caught too. Only suggest when one candidate is uniquely closest.
+        def editDistance = { String a, String b ->
+            def prev = (0..b.length()).toList()
+            (1..a.length()).each { i ->
+                def cur = [i]
+                (1..b.length()).each { j ->
+                    cur[j] = [prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] == b[j - 1] ? 0 : 1)].min()
+                }
+                prev = cur
+            }
+            prev[b.length()]
+        }
+        def messages = unusedParams.collect { key ->
+            def ranked = validParams.collect { [candidate: it, distance: editDistance.call(key, it)] }
+            def closest = ranked.min { it.distance }
+            def unique = closest.distance <= 2 && ranked.count { it.distance == closest.distance } == 1
+            unique ? "'${key}' (did you mean '${closest.candidate}'?)" : "'${key}'"
+        }
+        error "buildKodi: unknown parameter ${messages.join(', ')}. Valid parameters: ${validParams.join(', ')}"
+    }
+
     // Platforms
     def platformsValid = [
         'Android_arm': 'arm-linux-androideabi',
