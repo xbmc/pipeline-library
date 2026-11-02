@@ -26,10 +26,17 @@ def call(Map buildParams = [:]) {
             prev[b.length()]
         }
         def messages = unusedParams.collect { key ->
-            def ranked = validParams.collect { [candidate: it, distance: editDistance.call(key, it)] }
+            // Stringify first: a non-String key (Integer, GString) would otherwise
+            // throw out of the closure and lose the message this whole check exists
+            // to produce. String.valueOf also tolerates a null key.
+            def name = String.valueOf(key)
+            // Compare case-insensitively so a lowercased key still gets the hint.
+            def ranked = validParams.collect { [candidate: it, distance: editDistance.call(name.toLowerCase(), it.toLowerCase())] }
             def closest = ranked.min { it.distance }
             def unique = closest.distance <= 2 && ranked.count { it.distance == closest.distance } == 1
-            unique ? "'${key}' (did you mean '${closest.candidate}'?)" : "'${key}'"
+            // Suppress the hint when the key is already spelled correctly — a GString
+            // that spells a valid key reads "'platform' (did you mean 'platform'?)".
+            unique && closest.candidate != name ? "'${name}' (did you mean '${closest.candidate}'?)" : "'${name}'"
         }
         error "buildKodi: unknown parameter ${messages.join(', ')}. Valid parameters: ${validParams.join(', ')}"
     }
