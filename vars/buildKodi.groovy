@@ -141,7 +141,8 @@ def call(Map buildParams = [:]) {
             docker {
                 image buildImage
                 label 'docker-android || docker-linux'
-                args '--userns=keep-id ' +
+                args '--init ' +
+                    '--userns=keep-id ' +
                     '-v /home/jenkins/jenkins-root/workspace/' + ccacheDir + ':/home/jenkins/.ccache:rw ' +
                     '-v /home/jenkins/jenkins-root/workspace/xbmc-tarballs:/home/jenkins/jenkins-root/workspace/xbmc-tarballs:rw ' + extraMount
                 customWorkspace "workspace/${JOB_BASE_NAME}${WORKSPACESUFFIX}"
