@@ -84,7 +84,11 @@ def call(Map buildParams = [:]) {
 
     // Build Job vars
     env.BUILDTHREADS = buildParams.containsKey('buildthreads') && buildParams.buildthreads <= 64 ? buildParams.buildthreads : 64
-    env.WORKSPACESUFFIX = platform =~ /Linux/ ? platform.toLowerCase() + renderSystem : ''
+    // One workspace per release branch, as the freestyle jobs have, so a build for one
+    // branch does not replace the depends build of another.
+    def targetBranch = env.ghprbTargetBranch ?: params.Revision
+    def branchSuffix = ['Nexus', 'Omega', 'Piers'].contains(targetBranch) ? '_' + targetBranch : ''
+    env.WORKSPACESUFFIX = (platform =~ /Linux/ ? platform.toLowerCase() + renderSystem : '') + branchSuffix
     env.TARBALLS_DIR = '$WORKSPACE/../xbmc-tarballs'
     env.CONFIGURATION = params.Configuration == 'Release' ? 'Release' : 'Debug'
     env.BUILD_CAUSE = env.BUILD_CAUSE ?: 'manual'
