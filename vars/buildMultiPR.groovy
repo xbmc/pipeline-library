@@ -25,6 +25,8 @@ import hudson.plugins.git.RevisionParameterAction
 import java.util.regex.Pattern
 import jenkins.model.Jenkins
 import org.jenkinsci.plugins.workflow.steps.FlowInterruptedException
+import org.kohsuke.github.GHCheckRun
+import org.kohsuke.github.GHCheckRunBuilder
 import org.kohsuke.github.GHPullRequest
 import org.kohsuke.github.GHPullRequestReviewBuilder
 import org.kohsuke.github.GHPullRequestReviewEvent
@@ -37,6 +39,9 @@ import org.kohsuke.github.GitHubBuilder
 @Field final String BOT_LOGIN = 'jenkins4kodi'
 @Field final String RETRY_RULES = '/var/jenkins_home/rules/failures.txt'
 @Field final String SUMMARY_CHECK = 'BuildMulti-PR'
+@Field final String GITHUB_APP_ID = 'github-app-xbmc'
+@Field String HEAD_SHA = null
+@Field Map CHECK_RUNS = [:]
 
 // BuildMulti-PR's ghprb trigger settings
 @Field final List SKIP_LABELS = ['No-Jenkins', 'No Jenkins', 'Jenkins: Ignore', 'Stale']
@@ -88,14 +93,13 @@ def call() {
     return
   }
   currentBuild.description = pr.title
-  recordRevision(currentBuild.rawBuild, pr.head, pr.baseSha)
+  HEAD_SHA = pr.head
 
   List platforms = platformsFor(pr.base)
   for (Map p : platforms) {
-    publishChecks name: p.check, status: 'QUEUED', title: 'Waiting for the PR checks', detailsURL: env.BUILD_URL
+    check(p.check, 'QUEUED', null, 'Waiting for the PR checks', env.BUILD_URL)
   }
-  publishChecks name: SUMMARY_CHECK, status: 'IN_PROGRESS', title: 'Checking the pull request',
-      detailsURL: env.BUILD_URL
+  check(SUMMARY_CHECK, 'IN_PROGRESS', null, 'Checking the pull request', env.BUILD_URL)
 
   Map results = [:]
   String stopped = null
@@ -127,17 +131,14 @@ def call() {
   } finally {
     for (Map p : platforms) {
       if (!results.containsKey(p.check)) {
-        publishChecks name: p.check, status: 'COMPLETED', conclusion: stopped ? 'CANCELED' : 'SKIPPED',
-            title: stopped ?: 'Not built', detailsURL: env.BUILD_URL
+        check(p.check, 'COMPLETED', stopped ? 'CANCELED' : 'SKIPPED', stopped ?: 'Not built', env.BUILD_URL)
       }
     }
     String overall = stopped ? 'ABORTED' : worst(results.values())
     if (!stopped) {
       reviewComments(prId, currentBuild.rawBuild).each { echo it }
     }
-    publishChecks name: SUMMARY_CHECK, status: 'COMPLETED',
-        conclusion: stopped && stopped != 'Cancelled' ? 'FAILURE' : conclusionOf(overall),
-        title: stopped ?: summaryTitle(results), detailsURL: env.BUILD_URL
+    check(SUMMARY_CHECK, 'COMPLETED', stopped && stopped != 'Cancelled' ? 'FAILURE' : conclusionOf(overall), stopped ?: summaryTitle(results), env.BUILD_URL)
     if (overall != 'SUCCESS') {
       currentBuild.result = overall
     }
@@ -176,30 +177,26 @@ String runPlatform(Map p, Map ctx) {
         return s.state != 'QUEUED'
       }
       if (s.state != 'STARTED') {
-        publishChecks name: p.check, status: 'COMPLETED', conclusion: 'CANCELED', title: 'Removed from the queue',
-            detailsURL: env.BUILD_URL
+        check(p.check, 'COMPLETED', 'CANCELED', 'Removed from the queue', env.BUILD_URL)
         return 'ABORTED'
       }
       runId = s.id
-      publishChecks name: p.check, status: 'IN_PROGRESS', title: s.name, detailsURL: s.url
+      check(p.check, 'IN_PROGRESS', null, s.name, s.url)
       waitUntil(initialRecurrencePeriod: 15000, quiet: true) {
         s = runState(runId)
         return !s.building
       }
       if (s.result != 'SUCCESS' && attempt < retries && isRetryable(runId)) {
         attempt++
-        publishChecks name: p.check, status: 'IN_PROGRESS', title: "${s.name}: ${s.result}, retrying",
-            detailsURL: s.url
+        check(p.check, 'IN_PROGRESS', null, "${s.name}: ${s.result}, retrying", s.url)
         continue
       }
-      publishChecks name: p.check, status: 'COMPLETED', conclusion: conclusionOf(s.result), title: "${s.name}: ${s.result}",
-          detailsURL: s.url
+      check(p.check, 'COMPLETED', conclusionOf(s.result), "${s.name}: ${s.result}", s.url)
       return s.result
     }
   } catch (FlowInterruptedException e) {
     stop(itemId, runId)
-    publishChecks name: p.check, status: 'COMPLETED', conclusion: 'CANCELED', title: 'Cancelled',
-        detailsURL: env.BUILD_URL
+    check(p.check, 'COMPLETED', 'CANCELED', 'Cancelled', env.BUILD_URL)
     throw e
   }
 }
@@ -331,8 +328,41 @@ void notifySlack(String result, String title) {
       message: "${env.JOB_NAME} - #${env.BUILD_NUMBER} ${result.toLowerCase().capitalize()} (<${env.BUILD_URL}|Open>)\n${title}"
 }
 
+/** Creates or updates the PR head's check run of that name; a GitHub error never fails the build. */
+void check(String name, String status, String conclusion, String title, String url) {
+  try {
+    CHECK_RUNS[name] = publishCheck(currentBuild.rawBuild, CHECK_RUNS[name] as Long, name, HEAD_SHA, status,
+        conclusion, title, url)
+  } catch (Exception e) {
+    echo "Could not publish check ${name}: ${e}"
+  }
+}
+
 /////////////////////////////
 // Jenkins and GitHub API calls, outside CPS
+
+@NonCPS
+Long publishCheck(Run build, Long id, String name, String sha, String status, String conclusion, String title,
+    String url) {
+  def credentials = org.jenkinsci.plugins.github_branch_source.Connector.lookupScanCredentials(
+      build.parent, 'https://api.github.com', GITHUB_APP_ID, 'xbmc')
+  def github = org.jenkinsci.plugins.github_branch_source.Connector.connect('https://api.github.com', credentials)
+  try {
+    GHRepository repo = github.getRepository('xbmc/xbmc')
+    def builder = id == null ? repo.createCheckRun(name, sha) : repo.updateCheckRun(id)
+    builder.withStatus(GHCheckRun.Status.values().find { it.toString() == status.toLowerCase() })
+    builder.withDetailsURL(url)
+    if (conclusion) {
+      String wanted = conclusion == 'CANCELED' ? 'cancelled' : conclusion.toLowerCase()
+      builder.withConclusion(GHCheckRun.Conclusion.values().find { it.toString() == wanted })
+      builder.withCompletedAt(new Date())
+    }
+    builder.add(new GHCheckRunBuilder.Output(title, title))
+    return builder.create().id
+  } finally {
+    org.jenkinsci.plugins.github_branch_source.Connector.release(github)
+  }
+}
 
 @NonCPS
 GHRepository repo() {
@@ -399,18 +429,6 @@ String preCheckFailure(int prId) {
     pr.setLabels(*pr.getLabels().collect { it.getName() }.minus('Rebase needed'))
   }
   return null
-}
-
-/**
- * Records the PR's revision on the build, so publishChecks finds the commit without fetching
- * the PR again; a Jenkinsfile from the Remote Jenkinsfile Provider leaves none.
- */
-@NonCPS
-void recordRevision(Run build, String headSha, String baseSha) {
-  def source = jenkins.scm.api.SCMSource.SourceByItem.findSource(build.parent)
-  def head = jenkins.scm.api.SCMHead.HeadByItem.findHead(build.parent)
-  def revision = new org.jenkinsci.plugins.github_branch_source.PullRequestSCMRevision(head, baseSha, headSha)
-  build.addAction(new jenkins.scm.api.SCMRevisionAction(source, revision))
 }
 
 /** Queues a platform build as MultiJob does: declared defaults, safe overrides, pinned commit. */
