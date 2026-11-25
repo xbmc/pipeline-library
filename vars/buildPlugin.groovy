@@ -13,6 +13,7 @@ def call(Map addonParams = [:])
 		'Nexus': 'nexus',
 		'Omega': 'omega',
 		'Piers': 'piers',
+		'Q': 'q',
 	]
 	def KODI_CURRENT_DEV_VERSION = VERSIONS_VALID.keySet()[-1]
 
