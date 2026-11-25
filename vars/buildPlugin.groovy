@@ -13,6 +13,7 @@ def call(Map addonParams = [:])
 		'Nexus': 'nexus',
 		'Omega': 'omega',
 		'Piers': 'piers',
+		'Q': 'q',
 	]
 	def KODI_CURRENT_DEV_VERSION = VERSIONS_VALID.keySet()[-1]
 
@@ -25,6 +26,7 @@ def call(Map addonParams = [:])
 		'osx-x86_64': 'osx64',
 		'osx-arm64': 'osx-arm64',
 		'tvos-aarch64': 'tvos',
+		'wasm': 'wasm',
 		'windows-arm64': 'windows/arm64',
 		'windows-i686': 'windows/win32',
 		'windows-x86_64': 'windows/x64'
@@ -38,6 +40,10 @@ def call(Map addonParams = [:])
 	if (versionsKeys.indexOf(version) < versionsKeys.indexOf('Piers'))
 	{
 		PLATFORMS_VALID.remove('windows-arm64')
+	}
+	if (versionsKeys.indexOf(version) < versionsKeys.indexOf('Q'))
+	{
+		PLATFORMS_VALID.remove('wasm')
 	}
 
 	def PLATFORMS_DEPLOY = [
