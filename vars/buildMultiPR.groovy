@@ -229,6 +229,9 @@ String skipReason(int prId, Map pr) {
   if (!pr.author.equalsIgnoreCase(PILOT_AUTHOR)) {
     return "Not in the pilot (head commit by ${pr.author})"
   }
+  if (pr.closed) {
+    return "PR #${prId} is ${pr.merged ? 'merged' : 'closed'}, nothing to build"
+  }
   if (SKIP_TARGETS.contains(pr.base)) {
     return "Target ${pr.base} is not built"
   }
@@ -355,6 +358,8 @@ Map pullRequest(int prId) {
     baseSha: pr.base.sha,
     login: pr.user.login,
     labels: pr.labels*.name,
+    closed: pr.state == org.kohsuke.github.GHIssueState.CLOSED,
+    merged: pr.isMerged(),
   ]
 }
 
