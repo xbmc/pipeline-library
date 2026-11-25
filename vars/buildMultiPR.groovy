@@ -166,7 +166,8 @@ String runPlatform(Map p, Map ctx) {
   Long itemId = null
   String runId = null
   try {
-    for (int attempt = 0; ; attempt++) {
+    int attempt = 0
+    while (true) {
       itemId = schedule(p.job, params, pin, currentBuild.rawBuild)
       runId = null
       Map s = [:]
@@ -186,6 +187,7 @@ String runPlatform(Map p, Map ctx) {
         return !s.building
       }
       if (s.result != 'SUCCESS' && attempt < retries && isRetryable(runId)) {
+        attempt++
         publishChecks name: p.check, status: 'IN_PROGRESS', title: "${s.name}: ${s.result}, retrying",
             detailsURL: s.url
         continue
@@ -286,7 +288,7 @@ done
 
 @NonCPS
 String worst(Collection results) {
-  if (results.contains('ABORTED')) {
+  if (results.isEmpty() || results.contains(null) || results.contains('ABORTED')) {
     return 'ABORTED'
   }
   if (results.contains('FAILURE')) {
@@ -313,7 +315,7 @@ String conclusionOf(String result) {
 
 @NonCPS
 String summaryTitle(Map results) {
-  Map counts = results.values().countBy { it }
+  Map counts = results.values().countBy { it ?: 'UNKNOWN' }
   return counts.collect { k, v -> "${v} ${k.toLowerCase()}" }.join(', ') ?: 'No platform built'
 }
 
