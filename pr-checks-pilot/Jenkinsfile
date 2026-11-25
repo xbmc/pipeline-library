@@ -1,0 +1,3 @@
+// Loaded by the BuildMulti-PR-checks multibranch job through the Remote Jenkinsfile Provider
+library 'buildKodi@master'
+buildMultiPR()
