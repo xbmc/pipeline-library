@@ -538,8 +538,7 @@ void checkLogging(GHPullRequest pullRequest) {
   pullRequest.listReviews().toList().findAll { it.getUser().getLogin() == BOT_LOGIN }.each { review ->
     if (review.getState() == GHPullRequestReviewState.PENDING) {
       review.delete()
-    } else if (review.getBody().isEmpty() && review.getState() in
-        [GHPullRequestReviewState.APPROVED, GHPullRequestReviewState.CHANGES_REQUESTED]) {
+    } else if (review.getBody().isEmpty()) {
       review.dismiss('')
     }
   }
