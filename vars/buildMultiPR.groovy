@@ -88,6 +88,7 @@ def call() {
     return
   }
   currentBuild.description = pr.title
+  recordRevision(currentBuild.rawBuild, pr.head, pr.baseSha)
 
   List platforms = platformsFor(pr.base)
   for (Map p : platforms) {
@@ -349,6 +350,7 @@ Map pullRequest(int prId) {
     title: pr.title ?: '',
     body: pr.body ?: '',
     base: pr.base.ref,
+    baseSha: pr.base.sha,
     login: pr.user.login,
     labels: pr.labels*.name,
   ]
@@ -390,6 +392,18 @@ String preCheckFailure(int prId) {
     pr.setLabels(*pr.getLabels().collect { it.getName() }.minus('Rebase needed'))
   }
   return null
+}
+
+/**
+ * Records the PR's revision on the build, so publishChecks finds the commit without fetching
+ * the PR again; a Jenkinsfile from the Remote Jenkinsfile Provider leaves none.
+ */
+@NonCPS
+void recordRevision(Run build, String headSha, String baseSha) {
+  def source = jenkins.scm.api.SCMSource.SourceByItem.findSource(build.parent)
+  def head = jenkins.scm.api.SCMHead.HeadByItem.findHead(build.parent)
+  def revision = new org.jenkinsci.plugins.github_branch_source.PullRequestSCMRevision(head, baseSha, headSha)
+  build.addAction(new jenkins.scm.api.SCMRevisionAction(source, revision))
 }
 
 /** Queues a platform build as MultiJob does: declared defaults, safe overrides, pinned commit. */
