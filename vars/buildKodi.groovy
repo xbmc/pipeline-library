@@ -79,13 +79,11 @@ def call(Map buildParams = [:]) {
 
     // Docker vars
     def defaultImage = platform =~ /Linux/ ? 'kodi/jenkins/linux-arm:latest' :
-                       platform =~ /WASM/ ? 'localhost/kodi/jenkins/wasm:1.0' : 'kodi/jenkins/android-build:latest'
+                       platform =~ /WASM/ ? 'localhost/kodi/jenkins/wasm:latest' : 'kodi/jenkins/android-build:latest'
     def buildImage = buildParams.containsKey('image') ? buildParams.image : defaultImage
     def renderSystem = buildParams.containsKey('rendersystem') && renderSystemsValid.contains(buildParams.rendersystem) ? buildParams.rendersystem : params.RENDERSYSTEM
     def extraMount = platform =~ /Android/ ? "-v /home/jenkins/android-tools/signing:/home/jenkins/android-tools/signing:ro -v /home/jenkins/jenkins-root/workspace/${platform}/.gradle:/home/jenkins/.gradle:rw" : ''
-    // Emscripten builds take no ccache mount: the image carries no ccache, and
-    // emcc would need CCACHE_DIR pointed at it anyway.
-    def ccacheDir = platform =~ /WASM/ ? '' : '.ccache' + platform
+    def ccacheDir = '.ccache' + platform
 
     def uploadArtifact = (env.UPLOAD_RESULT == true || env.UPLOAD_RESULT == 'true' || env.UPLOAD_RESULT == 'True') ? true : params.UPLOAD_RESULT
     def uploadFolder = env.BUILD_CAUSE == 'TIMERTRIGGER' || env.UPSTREAM_BUILD_CAUSE == 'TIMERTRIGGER' ? 'nightlies' : 'test-builds'
@@ -157,7 +155,7 @@ def call(Map buildParams = [:]) {
                 label 'docker-android || docker-linux'
                 args '--init ' +
                     '--userns=keep-id ' +
-                    (ccacheDir ? '-v /home/jenkins/jenkins-root/workspace/' + ccacheDir + ':/home/jenkins/.ccache:rw ' : '') +
+                    '-v /home/jenkins/jenkins-root/workspace/' + ccacheDir + ':/home/jenkins/.ccache:rw ' +
                     '-v /home/jenkins/jenkins-root/workspace/xbmc-tarballs:/home/jenkins/jenkins-root/workspace/xbmc-tarballs:rw ' + extraMount
                 customWorkspace "workspace/${JOB_BASE_NAME}${WORKSPACESUFFIX}"
             }
@@ -409,19 +407,17 @@ def call(Map buildParams = [:]) {
                 when { equals expected: 'WASM_wasm32', actual: platform }
                 steps {
                     script {
-                        // An emscripten build emits the four files directly into the build
-                        // directory; unlike apk/ipk there is no packaging step to run, so
-                        // this stage reports what was produced and archives it.
+                        // Packaging lives in the build system, not here: the in-tree
+                        // `package` target (cmake/scripts/wasm/Install.cmake) decides
+                        // what a browser build ships. This stage only runs it and
+                        // archives what it leaves behind, as for apk/ipk.
+                        sh '''
+                            cd $WORKSPACE/build
+                            make -j$BUILDTHREADS package
+                        '''
                         buildRev = sh(returnStdout: true, script: 'git show -s --abbrev=8  --pretty=format:"%cs_%h"').replace('-', '').replace('_', '-')
                         tag = env.PULLID ? 'PR' + env.PULLID : env.Revision
                         buildTag = "${buildRev}-${tag}".replace('/', '')
-                        sh '''
-                            cd $WORKSPACE/build
-                            for f in kodi.js kodi.wasm kodi.data audio_worklet_processor.js; do
-                              [ -f "$f" ] || { echo "wasm build is missing $f" >&2; exit 1; }
-                              echo "$f: $(du -h "$f" | cut -f1)"
-                            done
-                        '''
                         publishPattern = filename.split(',').collect { "build/${it}" }.join(',')
                         archiveArtifacts artifacts: publishPattern, followSymlinks: false
                         env.uploadFile = "${uploadFileName.replace('BUILDREV', buildTag)}"
