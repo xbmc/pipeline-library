@@ -536,11 +536,11 @@ void checkLogging(GHPullRequest pullRequest) {
       .each { it.delete() }
 
   pullRequest.listReviews().toList().findAll { it.getUser().getLogin() == BOT_LOGIN }.each { review ->
-    if (review.getBody().isEmpty()) {
-      review.dismiss('')
-    }
     if (review.getState() == GHPullRequestReviewState.PENDING) {
       review.delete()
+    } else if (review.getBody().isEmpty() && review.getState() in
+        [GHPullRequestReviewState.APPROVED, GHPullRequestReviewState.CHANGES_REQUESTED]) {
+      review.dismiss('')
     }
   }
 
@@ -570,6 +570,8 @@ void checkLogging(GHPullRequest pullRequest) {
   def review = b.create()
   if (review.listReviewComments().toList().size() > 0) {
     review.submit('', GHPullRequestReviewEvent.COMMENT)
+  } else {
+    review.delete()
   }
 }
 
