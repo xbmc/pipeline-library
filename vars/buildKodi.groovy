@@ -5,7 +5,8 @@ def call(Map buildParams = [:]) {
     def validParams = [
         'platform', 'rendersystem', 'toolchain_path', 'ndk_version', 'sdk_path',
         'ndk_path', 'image', 'binary_addons', 'buildthreads', 'addons',
-        'RUN_TESTS', 'qualityGateThreshold', 'FILTER_TESTS', 'cli_path'
+        'RUN_TESTS', 'qualityGateThreshold', 'FILTER_TESTS', 'cli_path',
+        'wasm_sdk_version'
     ]
     def unusedParams = buildParams.keySet().findAll { !validParams.contains(it) }
     if (unusedParams) {
@@ -50,6 +51,7 @@ def call(Map buildParams = [:]) {
         'Linux_arm64': 'aarch64-linux-gnu',
         'Linux_x86_64': 'x86_64-linux-gnu',
         'Ubuntu-ppa': 'linux-native',
+        'WASM_wasm32': 'wasm32-unknown-emscripten',
         'Linux_webos': 'arm-webos-linux-gnueabi'
     ]
 
@@ -63,6 +65,11 @@ def call(Map buildParams = [:]) {
     def renderSystemChoices = platform =~ /Linux/ ? renderSystemsValid : 'ignored'
     def toolChain = buildParams.containsKey('toolchain_path') ? buildParams.toolchain_path : '/usr'
 
+    // WASM. Emscripten is baked into the build image, so the default is the
+    // image's EMSDK rather than a host path. The version in the image and the
+    // one configure is given have to name the same tree — bump both together.
+    def wasmSdkVersion = buildParams.containsKey('wasm_sdk_version') ? buildParams.wasm_sdk_version : '7.0.1'
+
     // Android
     def ndksValid = ['28.2.13676358', '27.2.12479018', '26.2.11394342', '21.4.7075529']
     def ndkChoices = platform =~ /Android/ ? ndksValid : 'ignored'
@@ -71,7 +78,8 @@ def call(Map buildParams = [:]) {
     def ndkPath = buildParams.containsKey('ndk_path') ? buildParams.ndk_path : "${sdkPath}/ndk"
 
     // Docker vars
-    def defaultImage = platform =~ /Linux/ ? 'kodi/jenkins/linux-arm:latest' : 'kodi/jenkins/android-build:latest'
+    def defaultImage = platform =~ /Linux/ ? 'kodi/jenkins/linux-arm:latest' :
+                       platform =~ /WASM/ ? 'localhost/kodi/jenkins/wasm:latest' : 'kodi/jenkins/android-build:latest'
     def buildImage = buildParams.containsKey('image') ? buildParams.image : defaultImage
     def renderSystem = buildParams.containsKey('rendersystem') && renderSystemsValid.contains(buildParams.rendersystem) ? buildParams.rendersystem : params.RENDERSYSTEM
     def extraMount = platform =~ /Android/ ? "-v /home/jenkins/android-tools/signing:/home/jenkins/android-tools/signing:ro -v /home/jenkins/jenkins-root/workspace/${platform}/.gradle:/home/jenkins/.gradle:rw" : ''
@@ -241,6 +249,30 @@ def call(Map buildParams = [:]) {
                                 verifyHash = "_${CONFIGURATION}_${renderSystem}"
                                 canUpload = false
                                 break
+                            case 'WASM_wasm32':
+                                os = 'wasm'
+                                env.CONFIGURATION = params.Configuration == 'Default' ? 'Release' : params.Configuration
+                                // cmakebuildsys reads the make variable Configuration, not
+                                // CONFIGURATION, and Default is non-empty so its own Release
+                                // fallback never fires. Passing it through would configure
+                                // with -DCMAKE_BUILD_TYPE=Default, which matches no
+                                // CMAKE_CXX_FLAGS_<CONFIG> set and builds without optimisation.
+                                env.Configuration = env.CONFIGURATION
+                                // Emscripten is in the image at $EMSDK; configure takes the SDK
+                                // directory as the toolchain and resolves emcc/em++ from it. The
+                                // pinned version lives in the image and in wasmSdkVersion, which
+                                // is folded into verifyHash so an SDK bump rebuilds depends.
+                                env.CONFIGEXTRA = "--with-platform=wasm --with-toolchain=\${EMSDK}"
+                                // The package target stages a servable bundle here; the
+                                // pipeline archives the directory, not individual files.
+                                env.filename = 'wasm_packaging/**'
+                                uploadFileName = 'kodi-BUILDREV-wasm'
+                                // The pipeline writes and reads its own tag in Check/Build
+                                // depends, so the in-tree tarball default and the two hash
+                                // formats cannot drift apart here.
+                                verifyHash = "_${CONFIGURATION}_${wasmSdkVersion}"
+                                canUpload = false
+                                break
                             case 'Linux_webos':
                                 os = 'linux'
                                 env.CONFIGURATION = params.Configuration == 'Default' ? 'Release' : params.Configuration
@@ -375,6 +407,28 @@ def call(Map buildParams = [:]) {
                         sh '[ -f $WORKSPACE/${filename}.aab ] && mv $WORKSPACE/${filename}.aab $WORKSPACE/${uploadFile}.aab || :'
                         publishPattern = "${uploadFile}.apk,${uploadFile}.aab"
                         archiveArtifacts artifacts: publishPattern, followSymlinks: false
+                    }
+                }
+            }
+
+            stage('Package wasm') {
+                when { equals expected: 'WASM_wasm32', actual: platform }
+                steps {
+                    script {
+                        // Packaging is a build-system concern: the in-tree `package`
+                        // target stages a servable browser build in
+                        // build/wasm_packaging, so this stage runs it and archives
+                        // that directory rather than knowing what a build emits.
+                        sh '''
+                            cd $WORKSPACE/build
+                            make -j$BUILDTHREADS package
+                        '''
+                        buildRev = sh(returnStdout: true, script: 'git show -s --abbrev=8  --pretty=format:"%cs_%h"').replace('-', '').replace('_', '-')
+                        tag = env.PULLID ? 'PR' + env.PULLID : env.Revision
+                        buildTag = "${buildRev}-${tag}".replace('/', '')
+                        publishPattern = filename.split(',').collect { "build/${it}" }.join(',')
+                        archiveArtifacts artifacts: publishPattern, followSymlinks: false
+                        env.uploadFile = "${uploadFileName.replace('BUILDREV', buildTag)}"
                     }
                 }
             }
