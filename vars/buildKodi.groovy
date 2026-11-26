@@ -252,6 +252,12 @@ def call(Map buildParams = [:]) {
                             case 'WASM_wasm32':
                                 os = 'wasm'
                                 env.CONFIGURATION = params.Configuration == 'Default' ? 'Release' : params.Configuration
+                                // cmakebuildsys reads the make variable Configuration, not
+                                // CONFIGURATION, and Default is non-empty so its own Release
+                                // fallback never fires. Passing it through would configure
+                                // with -DCMAKE_BUILD_TYPE=Default, which matches no
+                                // CMAKE_CXX_FLAGS_<CONFIG> set and builds without optimisation.
+                                env.Configuration = env.CONFIGURATION
                                 // Emscripten is in the image at $EMSDK; configure takes the SDK
                                 // directory as the toolchain and resolves emcc/em++ from it. The
                                 // pinned version lives in the image and in wasmSdkVersion, which
