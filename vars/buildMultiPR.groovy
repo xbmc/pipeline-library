@@ -391,7 +391,7 @@ Map changedLines(String diff) {
 List issuesOf(String runId) {
   Run run = Run.fromExternalizableId(runId)
   List issues = []
-  run.getAllActions().findAll { it.class.name == 'io.jenkins.plugins.analysis.core.model.ResultAction' }.each { a ->
+  run.getAllActions().findAll { it.getClass().name == 'io.jenkins.plugins.analysis.core.model.ResultAction' }.each { a ->
     a.result.issues.each { i ->
       issues.add([file: i.fileName, line: i.lineStart, message: i.message, tool: a.id])
     }
