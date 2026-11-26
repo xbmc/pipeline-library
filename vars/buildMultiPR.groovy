@@ -105,11 +105,13 @@ def call() {
   String stopped = null
   try {
     String mergeSha = null
+    Map changed = [:]
     node('buildall') {
       ws('workspace/BuildMulti-PR-checks') {
         stopped = preCheckFailure(prId)
         if (!stopped) {
           mergeSha = checkoutAndFormat(prId)
+          changed = changedLines(sh(returnStdout: true, script: 'git diff -U0 --no-color --no-ext-diff HEAD~ HEAD'))
         }
       }
     }
@@ -118,7 +120,7 @@ def call() {
       return
     }
 
-    Map ctx = [prId: prId, pr: pr, mergeSha: mergeSha]
+    Map ctx = [prId: prId, pr: pr, mergeSha: mergeSha, changed: changed]
     Map branches = [:]
     for (Map p : platforms) {
       Map platform = p
@@ -191,7 +193,14 @@ String runPlatform(Map p, Map ctx) {
         check(p.check, 'IN_PROGRESS', null, "${s.name}: ${s.result}, retrying", s.url)
         continue
       }
-      check(p.check, 'COMPLETED', conclusionOf(s.result), "${s.name}: ${s.result}", s.url)
+      List warnings = []
+      try {
+        warnings = newWarnings(issuesOf(runId), ctx.changed)
+      } catch (Exception e) {
+        echo "Could not read the warnings of ${s.name}: ${e}"
+      }
+      check(p.check, 'COMPLETED', conclusionOf(s.result), warningsTitle("${s.name}: ${s.result}", warnings), s.url,
+          warningsSummary(warnings), warnings)
       return s.result
     }
   } catch (FlowInterruptedException e) {
@@ -328,14 +337,93 @@ void notifySlack(String result, String title) {
       message: "${env.JOB_NAME} - #${env.BUILD_NUMBER} ${result.toLowerCase().capitalize()} (<${env.BUILD_URL}|Open>)\n${title}"
 }
 
-/** Creates or updates the PR head's check run of that name; a GitHub error never fails the build. */
 void check(String name, String status, String conclusion, String title, String url) {
+  check(name, status, conclusion, title, url, null, [])
+}
+
+/** Creates or updates the PR head's check run of that name; a GitHub error never fails the build. */
+void check(String name, String status, String conclusion, String title, String url, String summary,
+    List warnings) {
   try {
     CHECK_RUNS[name] = publishCheck(currentBuild.rawBuild, CHECK_RUNS[name] as Long, name, HEAD_SHA, status,
-        conclusion, title, url)
+        conclusion, title, url, summary, warnings)
   } catch (Exception e) {
     echo "Could not publish check ${name}: ${e}"
+    if (!warnings.isEmpty()) {
+      // A rejected annotation must not leave the check unfinished
+      check(name, status, conclusion, title, url, summary, [])
+    }
   }
+}
+
+/** The lines each file gained in `git diff -U0` output, as [first, last] ranges. */
+@NonCPS
+Map changedLines(String diff) {
+  Map changed = [:]
+  String file = null
+  diff.eachLine { line ->
+    if (line.startsWith('+++ ')) {
+      file = line == '+++ /dev/null' ? null : line.substring(4).replaceFirst('^b/', '')
+      return
+    }
+    def hunk = file ? (line =~ /^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@/) : null
+    if (hunk != null && hunk.find()) {
+      int start = hunk.group(1) as int
+      int count = hunk.group(2) != null ? hunk.group(2) as int : 1
+      if (count > 0) {
+        changed.get(file, []).add([start, start + count - 1])
+      }
+    }
+  }
+  return changed
+}
+
+/** Every issue the warnings plugin recorded on a run, as plain maps. */
+@NonCPS
+List issuesOf(String runId) {
+  Run run = Run.fromExternalizableId(runId)
+  List issues = []
+  run.getAllActions().findAll { it.class.name == 'io.jenkins.plugins.analysis.core.model.ResultAction' }.each { a ->
+    a.result.issues.each { i ->
+      issues.add([file: i.fileName, line: i.lineStart, message: i.message, tool: a.id])
+    }
+  }
+  return issues
+}
+
+/** The issues that sit on a line this PR added or changed, one per file, line and message. */
+@NonCPS
+List newWarnings(List issues, Map changed) {
+  Map found = [:]
+  issues.each { i ->
+    String file = (i.file ?: '').replace('\\', '/')
+    String path = changed.keySet().find { p -> file.equalsIgnoreCase(p) || file.toLowerCase().endsWith('/' + p.toLowerCase()) }
+    int line = (i.line ?: 0) as int
+    if (path && changed[path].any { r -> line >= r[0] && line <= r[1] }) {
+      found.putIfAbsent("${path}:${line}:${i.message}".toString(), [path: path, line: line, message: i.message ?: ''])
+    }
+  }
+  return found.values().sort { a, b -> a.path <=> b.path ?: a.line <=> b.line } as List
+}
+
+@NonCPS
+String warningsTitle(String title, List warnings) {
+  if (warnings.isEmpty()) {
+    return title
+  }
+  return "${title}, ${warnings.size()} new warning${warnings.size() == 1 ? '' : 's'}".toString()
+}
+
+@NonCPS
+String warningsSummary(List warnings) {
+  if (warnings.isEmpty()) {
+    return null
+  }
+  String listed = warnings.take(100).collect { w -> "- `${w.path}:${w.line}` ${w.message}" }.join('\n')
+  if (warnings.size() > 100) {
+    listed += "\n- and ${warnings.size() - 100} more"
+  }
+  return 'Warnings on lines this PR changed:\n\n' + listed
 }
 
 /////////////////////////////
@@ -343,7 +431,7 @@ void check(String name, String status, String conclusion, String title, String u
 
 @NonCPS
 Long publishCheck(Run build, Long id, String name, String sha, String status, String conclusion, String title,
-    String url) {
+    String url, String summary, List warnings) {
   def credentials = org.jenkinsci.plugins.github_branch_source.Connector.lookupScanCredentials(
       build.parent, 'https://api.github.com', GITHUB_APP_ID, 'xbmc')
   def github = org.jenkinsci.plugins.github_branch_source.Connector.connect('https://api.github.com', credentials)
@@ -357,7 +445,13 @@ Long publishCheck(Run build, Long id, String name, String sha, String status, St
       builder.withConclusion(GHCheckRun.Conclusion.values().find { it.toString() == wanted })
       builder.withCompletedAt(new Date())
     }
-    builder.add(new GHCheckRunBuilder.Output(title, title))
+    def output = new GHCheckRunBuilder.Output(title, summary ?: title)
+    // GitHub takes at most 50 annotations per request
+    warnings.take(50).each { w ->
+      output.add(new GHCheckRunBuilder.Annotation(w.path, w.line as int, GHCheckRun.AnnotationLevel.WARNING,
+          w.message ?: 'warning'))
+    }
+    builder.add(output)
     return builder.create().id
   } finally {
     org.jenkinsci.plugins.github_branch_source.Connector.release(github)
