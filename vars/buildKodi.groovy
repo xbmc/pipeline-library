@@ -257,7 +257,9 @@ def call(Map buildParams = [:]) {
                                 // pinned version lives in the image and in wasmSdkVersion, which
                                 // is folded into verifyHash so an SDK bump rebuilds depends.
                                 env.CONFIGEXTRA = "--with-platform=wasm --with-toolchain=\${EMSDK}"
-                                env.filename = 'kodi.js,kodi.wasm,kodi.data,audio_worklet_processor.js'
+                                // The package target stages a servable bundle here; the
+                                // pipeline archives the directory, not individual files.
+                                env.filename = 'wasm_packaging/**'
                                 uploadFileName = 'kodi-BUILDREV-wasm'
                                 // The pipeline writes and reads its own tag in Check/Build
                                 // depends, so the in-tree tarball default and the two hash
@@ -407,10 +409,10 @@ def call(Map buildParams = [:]) {
                 when { equals expected: 'WASM_wasm32', actual: platform }
                 steps {
                     script {
-                        // Packaging lives in the build system, not here: the in-tree
-                        // `package` target (cmake/scripts/wasm/Install.cmake) decides
-                        // what a browser build ships. This stage only runs it and
-                        // archives what it leaves behind, as for apk/ipk.
+                        // Packaging is a build-system concern: the in-tree `package`
+                        // target stages a servable browser build in
+                        // build/wasm_packaging, so this stage runs it and archives
+                        // that directory rather than knowing what a build emits.
                         sh '''
                             cd $WORKSPACE/build
                             make -j$BUILDTHREADS package
