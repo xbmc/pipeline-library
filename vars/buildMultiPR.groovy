@@ -188,6 +188,14 @@ String runPlatform(Map p, Map ctx) {
         s = runState(runId)
         return !s.building
       }
+      // GitHub replaces the merge commit whenever the target moves, so a build that queued long
+      // enough cannot fetch the one it was pinned to
+      if (s.result != 'SUCCESS' && pin && attempt < retries && lostPin(runId, pin)) {
+        attempt++
+        pin = mergeCommit(ctx.prId) ?: pin
+        check(p.check, 'IN_PROGRESS', null, "${s.name}: merge commit replaced, retrying", s.url)
+        continue
+      }
       if (s.result != 'SUCCESS' && attempt < retries && isRetryable(runId)) {
         attempt++
         check(p.check, 'IN_PROGRESS', null, "${s.name}: ${s.result}, retrying", s.url)
@@ -580,6 +588,31 @@ Map runState(String runId) {
   Run run = Run.fromExternalizableId(runId)
   return [building: run.isBuilding(), result: run.result?.toString() ?: 'FAILURE', url: run.absoluteUrl,
           name: run.fullDisplayName]
+}
+
+/** The run's checkout failed because the pinned commit could not be found. */
+@NonCPS
+boolean lostPin(String runId, String pin) {
+  Run run = Run.fromExternalizableId(runId)
+  BufferedReader reader = new BufferedReader(run.logReader)
+  String failure = "rev-parse ${pin}^{commit}\" returned status code 128".toString()
+  try {
+    String line
+    while ((line = reader.readLine()) != null) {
+      if (line.contains(failure)) {
+        return true
+      }
+    }
+  } finally {
+    reader.close()
+  }
+  return false
+}
+
+/** The PR's current test merge commit. */
+@NonCPS
+String mergeCommit(int prId) {
+  return repo().getPullRequest(prId).getMergeCommitSha()
 }
 
 /** MultiJob's retry rule: the log matches a line of the shared failure rules. */
